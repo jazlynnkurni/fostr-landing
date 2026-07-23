@@ -1,0 +1,268 @@
+/* WORKLIGHT — concept 5. All rules scoped under .wl- */
+
+.wl-root {
+  position: relative;
+  background: var(--bedrock);
+  color: var(--paper);
+  font-family: var(--font-sans);
+}
+
+.wl-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.wl-canvas canvas { display: block; width: 100% !important; height: 100% !important; }
+
+.wl-panel, .wl-hero { position: relative; z-index: 1; box-sizing: border-box; }
+.wl-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8vh 6vw;
+  overflow: hidden;
+}
+
+/* Headlines: always-on AAA-contrast DOM text. The beam never gates these. */
+.wl-h {
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(1.65rem, 2.6vw + 1rem, 3rem);
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  color: var(--paper);
+  max-width: 22ch;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.wl-mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+/* ---- hero (above ground) ---- */
+.wl-hero {
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 6vw;
+}
+.wl-hero::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 16px;
+  background: linear-gradient(to bottom, rgba(42, 33, 28, 0), #2a211c);
+}
+.wl-hero .wl-h {
+  color: var(--ink);
+  font-size: clamp(2rem, 3.4vw + 1.2rem, 3.6rem);
+  position: relative;
+  z-index: 2;
+}
+.wl-mast { position: absolute; top: 26px; left: 50%; color: var(--ink); }
+.wl-cable {
+  position: absolute;
+  top: 94px; bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(to bottom, rgba(30, 38, 36, 0.55), rgba(30, 38, 36, 0.22));
+}
+.wl-badge {
+  position: relative;
+  z-index: 2;
+  display: inline-block;
+  margin-bottom: 22px;
+  padding: 6px 14px;
+  border: 1px solid var(--teal);
+  color: #3e7676;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: rgba(247, 245, 241, 0.7);
+}
+
+/* ---- tooltip question: gold, half-lit below the beam edge ---- */
+.wl-q {
+  position: relative;
+  z-index: 2;
+  margin-top: 9vh;
+  color: var(--gold);
+  font-size: 0.95rem;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-align: center;
+  animation: wl-glint 2.6s ease-in-out infinite;
+}
+.wl-q::after {
+  content: "";
+  display: block;
+  margin: 10px auto 0;
+  width: 1px;
+  height: 26px;
+  background: linear-gradient(to bottom, rgba(201, 162, 39, 0.8), rgba(201, 162, 39, 0));
+}
+.wl-hero .wl-q { color: #8a6d10; } /* darker gold for AAA on paper */
+@keyframes wl-glint {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* ---- panel 2: form sheets in the soil wall ---- */
+.wl-stage {
+  position: relative;
+  width: min(760px, 92vw);
+  min-height: 58vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wl-sheet {
+  position: absolute;
+  width: 132px;
+  padding: 12px 12px 16px;
+  background: #241c17;
+  border: 1px solid rgba(247, 245, 241, 0.1);
+  border-radius: 3px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+.wl-sheet span {
+  display: block;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: rgba(247, 245, 241, 0.6);
+  border-bottom: 1px solid rgba(247, 245, 241, 0.14);
+  padding: 5px 0 3px;
+}
+@media (max-width: 560px) {
+  .wl-sheet { width: 96px; }
+}
+
+/* ---- panel 4: destination cards ---- */
+.wl-docs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 14px;
+  margin-top: 7vh;
+  width: min(720px, 90vw);
+}
+@media (max-width: 640px) {
+  .wl-docs { grid-template-columns: repeat(2, 1fr); }
+}
+.wl-doccard {
+  border: 1px solid rgba(93, 161, 161, 0.4);
+  border-radius: 8px;
+  background: rgba(25, 20, 18, 0.72);
+  padding: 16px 12px 18px;
+  text-align: center;
+}
+.wl-doccard::before {
+  content: "";
+  display: block;
+  margin: 0 auto 10px;
+  width: 1px;
+  height: 18px;
+  background: var(--teal);
+  opacity: 0.8;
+}
+.wl-doccard .wl-mono { color: rgba(247, 245, 241, 0.88); }
+
+/* ---- panel 5: the trace ---- */
+.wl-note, .wl-filing {
+  width: min(560px, 88vw);
+  background: #211a15;
+  border-radius: 6px;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 1;
+  transform: translateX(4%);
+}
+.wl-note { border-left: 2px solid var(--teal); }
+.wl-filing { border-left: 2px solid rgba(247, 245, 241, 0.25); }
+.wl-note .wl-mono { color: var(--teal); display: block; margin-bottom: 8px; }
+.wl-filing .wl-mono { color: rgba(247, 245, 241, 0.55); display: block; margin-bottom: 8px; }
+.wl-body { margin: 0; font-size: 0.98rem; line-height: 1.55; color: rgba(247, 245, 241, 0.92); }
+.wl-filing-line {
+  background-image: linear-gradient(var(--teal), var(--teal));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  padding-bottom: 2px;
+}
+
+/* ---- panel 6: laterals + business line ---- */
+.wl-lats { position: relative; width: 100%; height: 10vh; margin-top: 5vh; }
+.wl-lat { position: absolute; color: rgba(247, 245, 241, 0.8); }
+.wl-lat-left { left: 4vw; top: 55%; }
+.wl-lat-right { right: 4vw; top: 15%; }
+.wl-biz { margin-top: 4vh; color: rgba(247, 245, 241, 0.78); text-align: center; }
+
+/* ---- panel 7: subtraction ---- */
+.wl-bq { margin: 0; position: relative; z-index: 1; }
+.wl-quote {
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(1.02rem, 1vw + 0.75rem, 1.3rem);
+  line-height: 1.65;
+  max-width: 36ch;
+  color: #f2e9d7;
+  text-align: left;
+}
+.wl-attr { display: block; margin-top: 22px; color: var(--gold); }
+
+/* ---- panel 8: the switch-on ---- */
+.wl-p8 { text-align: center; }
+.wl-cta-glow {
+  position: absolute;
+  width: min(560px, 80vw);
+  height: 40vh;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(93, 161, 161, 0.16), rgba(93, 161, 161, 0));
+  pointer-events: none;
+}
+.wl-logo-end { color: var(--paper); position: relative; z-index: 1; }
+.wl-ctas {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 5vh;
+  position: relative;
+  z-index: 1;
+}
+.wl-btn {
+  display: inline-block;
+  padding: 15px 26px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.98rem;
+  text-decoration: none;
+}
+.wl-btn-primary { background: var(--paper); color: var(--ink); }
+.wl-btn-ghost { border: 1px solid rgba(247, 245, 241, 0.55); color: var(--paper); }
+
+/* ---- static fallback: lit vignette per panel, fully grown roots ---- */
+.wl-roots-still { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.wl-static .wl-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 62% 46% at 50% 46%, rgba(255, 246, 228, 0.1), rgba(255, 246, 228, 0) 72%);
+  pointer-events: none;
+}
+.wl-static .wl-p7::before {
+  background: radial-gradient(ellipse 42% 30% at 50% 50%, rgba(201, 162, 39, 0.16), rgba(201, 162, 39, 0) 70%);
+}
+.wl-static .wl-q { animation: none; opacity: 0.9; }
+.wl-static .wl-lat, .wl-static .wl-biz { opacity: 0.9 !important; }
+.wl-static .wl-note { opacity: 1 !important; }
