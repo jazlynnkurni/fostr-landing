@@ -22,6 +22,9 @@ function hash(i) {
 export default function HeatField({ mode = "band" }) {
   const ref = useRef(null);
   const isTrail = mode === "trail";
+  // trail cells are finer and the brush is a thin wake, not a blob
+  const CELLSZ = isTrail ? 10 : CELL;
+  const BRUSH = isTrail ? 0.55 : 1.3;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -78,8 +81,8 @@ export default function HeatField({ mode = "band" }) {
       if (r.width < 4 || r.height < 4) return;
       canvas.width = Math.round(r.width * dpr);
       canvas.height = Math.round(r.height * dpr);
-      cols = Math.max(8, Math.ceil(r.width / CELL));
-      rows = Math.max(6, Math.ceil(r.height / CELL));
+      cols = Math.max(8, Math.ceil(r.width / CELLSZ));
+      rows = Math.max(6, Math.ceil(r.height / CELLSZ));
       heat = new Float32Array(cols * rows);
       tmp = new Float32Array(cols * rows);
       jit = new Float32Array(cols * rows);
@@ -89,7 +92,7 @@ export default function HeatField({ mode = "band" }) {
     }
 
     function inject(cx, cy, amt) {
-      const r = BRUSH_R;
+      const r = BRUSH;
       const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(cols - 1, Math.ceil(cx + r));
       const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(rows - 1, Math.ceil(cy + r));
       for (let y = y0; y <= y1; y++) {
@@ -106,7 +109,7 @@ export default function HeatField({ mode = "band" }) {
     function step() {
       // trail cells stick to the CONTENT: shift the grid as the page scrolls
       if (isTrail) {
-        accShift += (window.scrollY - lastScroll) / CELL;
+        accShift += (window.scrollY - lastScroll) / CELLSZ;
         lastScroll = window.scrollY;
         const sh = Math.trunc(accShift);
         if (sh !== 0) {
@@ -127,7 +130,8 @@ export default function HeatField({ mode = "band" }) {
           const rr = heat[y * cols + Math.min(cols - 1, x + 1)];
           const u = heat[Math.max(0, y - 1) * cols + x];
           const d = heat[Math.min(rows - 1, y + 1) * cols + x];
-          tmp[i] = (heat[i] * (1 - DIFFUSE) + ((l + rr + u + d) / 4) * DIFFUSE) * (isTrail ? 0.986 : DECAY);
+          const df = isTrail ? 0.16 : DIFFUSE;
+          tmp[i] = (heat[i] * (1 - df) + ((l + rr + u + d) / 4) * df) * (isTrail ? 0.982 : DECAY);
         }
       }
       const swap = heat; heat = tmp; tmp = swap;
@@ -135,10 +139,10 @@ export default function HeatField({ mode = "band" }) {
       // cursor: heat follows the pointer, more heat with more speed
       if (ptr.inside) {
         const dx = ptr.cx - ptr.pcx, dy = ptr.cy - ptr.pcy;
-        const dist = Math.min(14, Math.hypot(dx, dy));
+        const dist = Math.min(8, Math.hypot(dx, dy));
         const steps = Math.max(1, Math.ceil(dist));
         for (let s = 0; s <= steps; s++) {
-          inject(ptr.pcx + (dx * s) / steps, ptr.pcy + (dy * s) / steps, (0.30 + dist * 0.06) / steps);
+          inject(ptr.pcx + (dx * s) / steps, ptr.pcy + (dy * s) / steps, (isTrail ? 0.42 : 0.5) / steps);
         }
       }
       ptr.pcx = ptr.cx; ptr.pcy = ptr.cy;
@@ -155,7 +159,7 @@ export default function HeatField({ mode = "band" }) {
 
     function render() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      const c = CELL * dpr, gap = Math.max(1, Math.round(dpr));
+      const c = CELLSZ * dpr, gap = Math.max(1, Math.round(dpr));
       if (isTrail) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       } else {
@@ -196,8 +200,8 @@ export default function HeatField({ mode = "band" }) {
 
     const onMove = (e) => {
       const r = canvas.getBoundingClientRect();
-      const x = (e.clientX - r.left) / CELL;
-      const y = (e.clientY - r.top) / CELL;
+      const x = (e.clientX - r.left) / CELLSZ;
+      const y = (e.clientY - r.top) / CELLSZ;
       const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
       if (inside && !ptr.inside) { ptr.pcx = x; ptr.pcy = y; }
       ptr.inside = inside;

@@ -7,7 +7,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from "lenis";
 import Logo from "../../components/Logo.jsx";
 import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE } from "../../copy.js";
-import { SECTION_VHS, PB, DEPTH_MARKS } from "./journey.js";
+import { SECTION_VHS, PB } from "./journey.js";
 import StaticTaproot from "./StaticTaproot.jsx";
 import HeatField from "./HeatField.jsx";
 
@@ -81,22 +81,6 @@ function Panel({ i, progress, place = "center", color = "var(--ink)", backdrop, 
         }}
       >
         {backdrop && <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>{backdrop}</div>}
-        {DEPTH_MARKS[i] && (
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: 26,
-              top: "16vh",
-              ...mono,
-              fontSize: 10,
-              letterSpacing: "0.3em",
-              color: "rgba(30,38,36,0.42)",
-            }}
-          >
-            {DEPTH_MARKS[i]}
-          </div>
-        )}
         <motion.div style={{ opacity, y, color, width: "100%", maxWidth: 880, position: "relative" }}>{children}</motion.div>
       </div>
       {after}
@@ -242,20 +226,6 @@ function ScrollTaproot() {
         }
       >
         <div style={{ textAlign: "left", paddingTop: "4vh" }}>
-          <span
-            style={{
-              display: "inline-block",
-              textTransform: "uppercase",
-              letterSpacing: "0.28em",
-              fontSize: 11,
-              padding: "7px 14px",
-              border: "1px solid rgba(30,38,36,0.35)",
-              borderRadius: 999,
-              marginBottom: 24,
-            }}
-          >
-            {PANELS[0].badge}
-          </span>
           <H size="clamp(2.2rem, 4.8vw, 3.9rem)" style={{ maxWidth: "17ch", margin: 0 }}>
             {PANELS[0].text}
           </H>

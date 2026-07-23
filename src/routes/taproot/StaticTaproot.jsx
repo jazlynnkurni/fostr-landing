@@ -3,7 +3,6 @@
 // taproot fully grown as a continuous teal rule and questions as gold captions.
 import Logo from "../../components/Logo.jsx";
 import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE } from "../../copy.js";
-import { DEPTH_MARKS } from "./journey.js";
 
 const mono = { fontFamily: "var(--font-inter)", fontWeight: 600 };
 
@@ -67,9 +66,6 @@ function Section({ i, children, root = true }) {
       }}
     >
       {root && <Rule />}
-      {DEPTH_MARKS[i] && (
-        <div style={{ ...mono, fontSize: 10, letterSpacing: "0.3em", opacity: 0.5, marginBottom: 26 }}>{DEPTH_MARKS[i]}</div>
-      )}
       {children}
       <Caption text={PANELS[i].tooltip} />
     </section>
@@ -113,20 +109,6 @@ export default function StaticTaproot() {
       {/* 1 — hero, above ground */}
       <Section i={0} root={false}>
         <div style={{ paddingTop: "6vh" }}>
-          <span
-            style={{
-              display: "inline-block",
-              textTransform: "uppercase",
-              letterSpacing: "0.28em",
-              fontSize: 11,
-              padding: "7px 14px",
-              border: "1px solid rgba(30,38,36,0.35)",
-              borderRadius: 999,
-              marginBottom: 28,
-            }}
-          >
-            {PANELS[0].badge}
-          </span>
           <h1 style={{ ...h2Style, fontSize: "clamp(2.2rem, 6vw, 4.4rem)" }}>{PANELS[0].text}</h1>
         </div>
       </Section>
