@@ -44,7 +44,12 @@ function rampColor(y, out) {
 // Gaps use discard (no blending), which keeps edges crisp at any DPR.
 // Dotted "ascii" material: the root renders as a screen-space grid of dots with a
 // gentle shade shimmer. Gaps are static (no blinking); discard keeps edges crisp.
-function makeDotMaterial(hex, dot = 0.34, dropout = 0.06) {
+function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0) {
+  // Flowing-river ascii material. Dots live in a screen-space grid (crisp at any DPR),
+  // but bright "water packets" travel DOWN the tube length over time (via the uv.x
+  // length varying), so the root never sits still. `uHead` turns the very top into a
+  // turbulent, spray-gapped waterfall mouth. `vRound` (uv.y around the tube) shades the
+  // ribbon bright-center / dark-rim, giving the flat dots a rounded, 3D volume read.
   return new THREE.ShaderMaterial({
     uniforms: {
       uColor: { value: new THREE.Color(hex) },
@@ -52,21 +57,82 @@ function makeDotMaterial(hex, dot = 0.34, dropout = 0.06) {
       uCell: { value: 6.0 },
       uDot: { value: dot },
       uDrop: { value: dropout },
+      uHead: { value: head },
     },
-    vertexShader: `void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    vertexShader: `
+      varying float vLen; varying float vRound;
+      void main(){
+        vLen = uv.x; vRound = uv.y;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
     fragmentShader: `
-      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop;
+      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop; uniform float uHead;
+      varying float vLen; varying float vRound;
       float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       void main(){
         vec2 cell = floor(gl_FragCoord.xy / uCell);
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
         if (length(f) > uDot) discard;
-        if (hash(cell * 0.61) < uDrop) discard;                  // stable gaps, no blinking
-        float tstep = floor(uTime * 7.0);
-        float b = 0.9 + 0.1 * hash(cell + tstep * 1.37);         // gentle brightness shimmer
-        gl_FragColor = vec4(mix(vec3(1.0), uColor, b), 1.0);
+
+        float head = uHead * smoothstep(0.16, 0.0, vLen);        // waterfall mouth region
+        float drop = uDrop + head * 0.30;                        // spray gaps at the head
+        if (hash(cell * 0.61) < drop) discard;
+
+        float jit = hash(cell) * 0.22;
+        float spd = 0.85 + head * 1.7;                           // faster water at the head
+        float flow = fract(vLen * 20.0 - uTime * spd + jit);     // packets travel down
+        float fine = fract(vLen * 46.0 - uTime * spd * 1.7 - jit);
+        float packet = smoothstep(0.0, 0.10, flow) * (1.0 - smoothstep(0.10, 0.85, flow));
+        float ripple = smoothstep(0.0, 0.16, fine) * (1.0 - smoothstep(0.16, 1.0, fine));
+
+        float round3d = 1.0 - pow(abs(vRound - 0.5) * 2.0, 1.5); // bright center, dark rim
+
+        float t = clamp(0.24 + packet * 0.6 + ripple * 0.18 + round3d * 0.18
+                        + head * 0.22 * hash(cell + floor(uTime * 10.0)), 0.0, 1.0);
+        vec3 dark = uColor * 0.42;
+        vec3 light = mix(uColor, vec3(0.90, 0.99, 0.96), 0.7);
+        vec3 col = t < 0.5 ? mix(dark, uColor, t * 2.0) : mix(uColor, light, (t - 0.5) * 2.0);
+        gl_FragColor = vec4(col, 1.0);
       }`,
   });
+}
+
+// Variable-radius tube built to match TubeGeometry's index layout (so setDrawRange math
+// is unchanged): a wide waterfall mouth at the top (u->0) narrowing into the river.
+function taperTube(curve, tubularSegments, radialSegments, radiusFn) {
+  const frames = curve.computeFrenetFrames(tubularSegments, false);
+  const positions = [], uvs = [], indices = [];
+  const P = new THREE.Vector3();
+  for (let i = 0; i <= tubularSegments; i++) {
+    const u = i / tubularSegments;
+    curve.getPointAt(u, P);
+    const N = frames.normals[i], B = frames.binormals[i];
+    const r = radiusFn(u);
+    for (let j = 0; j <= radialSegments; j++) {
+      const ang = (j / radialSegments) * Math.PI * 2;
+      const cos = -Math.cos(ang), sin = Math.sin(ang);
+      positions.push(
+        P.x + r * (cos * N.x + sin * B.x),
+        P.y + r * (cos * N.y + sin * B.y),
+        P.z + r * (cos * N.z + sin * B.z)
+      );
+      uvs.push(u, j / radialSegments);
+    }
+  }
+  for (let i = 1; i <= tubularSegments; i++) {
+    for (let j = 1; j <= radialSegments; j++) {
+      const a = (radialSegments + 1) * (i - 1) + (j - 1);
+      const bb = (radialSegments + 1) * i + (j - 1);
+      const c = (radialSegments + 1) * i + j;
+      const d = (radialSegments + 1) * (i - 1) + j;
+      indices.push(a, bb, d, bb, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(indices);
+  return g;
 }
 
 // The taproot: one slightly wandering curve from just above the horizon to the seed.
@@ -139,15 +205,23 @@ function World({ progress, bridge }) {
     };
   }, []);
 
-  const rootGeom = useMemo(() => new THREE.TubeGeometry(mainCurve, 360, 0.115, 8, false), [mainCurve]);
+  const rootGeom = useMemo(
+    () =>
+      taperTube(mainCurve, 360, 8, (u) => {
+        const tt = Math.min(1, Math.max(0, (u - 0.17) / (0.0 - 0.17)));
+        const wide = tt * tt * (3 - 2 * tt); // 1 at the very top, 0 by u=0.17
+        return 0.125 * (1 + 1.9 * wide);     // river 0.125 -> waterfall mouth ~0.36
+      }),
+    [mainCurve]
+  );
 
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
-      root: makeDotMaterial("#1F5A59", 0.36),
-      branch: makeDotMaterial("#357B7A", 0.34),
-      lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12),
-      shoot: makeDotMaterial("#357B7A", 0.34),
+      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0),
+      branch: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
+      lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12, 0.0),
+      shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
     }),
     []
   );
