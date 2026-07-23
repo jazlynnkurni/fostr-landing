@@ -9,6 +9,7 @@ import {
   AnimatePresence,
   useScroll,
   useTransform,
+  useMotionValue,
   useMotionValueEvent,
   useReducedMotion,
 } from "framer-motion";
@@ -27,7 +28,8 @@ const pctX = (v) => `${(v / W) * 100}%`;
 const pctY = (v) => `${(v / H) * 100}%`;
 
 // ————— The master teal spine: strictly downward, asymmetric, never cute.
-// Small M-gaps are pen-through-node moments (dashing accumulates across subpaths).
+// One single subpath: per-subpath dash restarts are browser-inconsistent, so the
+// pen runs straight through the node circles (which paint over it).
 const SPINE_D = [
   "M250 600",
   "C252 652 240 690 244 740",
@@ -39,7 +41,7 @@ const SPINE_D = [
   "C247 1512 248 1560 248 1610",
   "L248 2140", // panel 3: the plainest stroke on the page — dead straight
   "C248 2226 232 2320 238 2414",
-  "M238 2426",
+  "L238 2426",
   "C240 2472 254 2522 262 2588",
   "C270 2654 264 2760 258 2836",
   "C252 2912 244 2966 240 3020",
@@ -49,20 +51,20 @@ const SPINE_D = [
   "L42 3660",
   "C42 3742 64 3810 104 3872",
   "C136 3922 174 3988 184 4054",
-  "M184 4066",
+  "L184 4066",
   "C190 4140 192 4240 190 4348",
   "C188 4452 196 4530 200 4630",
   "C204 4770 206 4910 198 5050",
   "C192 5160 194 5230 198 5308",
-  "C202 5380 234 5406 250 5450",
-  "C262 5484 268 5510 260 5532",
-  "C254 5546 244 5548 242 5538", // the final stroke curls into the seed
+  "C202 5420 230 5560 244 5640",
+  "C254 5688 262 5710 256 5730",
+  "C250 5744 240 5746 238 5736", // the final stroke curls into the seed
 ].join(" ");
 
 // Sprout drawn upward from the seed — the last thing drawn on the page is the brand.
-const SPROUT_STEM = "M247 5532 C249 5496 247 5458 247 5420";
-const SPROUT_LEAF_L = "M247 5420 C239 5390 218 5372 186 5366";
-const SPROUT_LEAF_R = "M247 5420 C257 5386 282 5368 314 5364";
+const SPROUT_STEM = "M243 5730 C245 5694 243 5656 243 5618";
+const SPROUT_LEAF_L = "M243 5618 C235 5588 214 5570 182 5564";
+const SPROUT_LEAF_R = "M243 5618 C253 5584 278 5566 310 5562";
 
 // Provenance trace: authored filing-first so it visibly re-draws BACKWARD up the page.
 const TRACE_D =
@@ -323,7 +325,6 @@ export default function Survey() {
   const maxP = useRef(0);
   const lastQ = useRef(0);
   const [ready, setReady] = useState(false);
-  const [spineLen, setSpineLen] = useState(0);
   const [activeQ, setActiveQ] = useState(-1);
   const [traced, setTraced] = useState(false);
   const effTraced = rm || traced;
@@ -342,25 +343,6 @@ export default function Survey() {
     };
   }, [rm]);
 
-  // Precompute the master path length + a monotone y→length lookup table.
-  useEffect(() => {
-    const el = masterRef.current;
-    if (!el) return;
-    const L = el.getTotalLength();
-    const N = 800;
-    const samples = [];
-    let my = 0;
-    for (let i = 0; i <= N; i++) {
-      const len = (L * i) / N;
-      const p = el.getPointAtLength(len);
-      my = Math.max(my, p.y);
-      samples.push([len, my]);
-    }
-    geomRef.current = { L, samples, el };
-    setSpineLen(L);
-    setReady(true);
-  }, []);
-
   const lookupLen = (targetY) => {
     const g = geomRef.current;
     if (!g) return 0;
@@ -376,10 +358,13 @@ export default function Survey() {
     return s[lo][0];
   };
 
-  // Scroll: progress of the ~70% viewport line through the plate.
+  // Scroll: progress of the ~70% viewport line through the plate. The end
+  // offset is "end end" so p = 1 is actually reachable at the bottom of the
+  // page on every viewport (with "end 0.7" the plate bottom can never cross
+  // the 70% line, and the finale ranges would be unreachable).
   const { scrollYProgress } = useScroll({
     target: plateRef,
-    offset: ["start 0.7", "end 0.7"],
+    offset: ["start 0.7", "end end"],
   });
 
   // THE LINE NEVER UN-DRAWS: clamp to the max progress reached.
@@ -389,9 +374,43 @@ export default function Survey() {
     return maxP.current;
   });
   const drawnLen = useTransform(prog, (m) => lookupLen(m * H));
-  const dashOff = useTransform(drawnLen, (l) =>
-    geomRef.current ? Math.max(geomRef.current.L - l, 0) : 0
-  );
+
+  // The spine's dash props live entirely in MotionValues, set imperatively.
+  // (Plain state-derived values mixed into a motion `style` are applied once
+  // at first render and never re-applied — that bug shipped the spine at
+  // dasharray:1 / opacity:0 forever. MotionValues always propagate.)
+  const spineDash = useMotionValue(100000);
+  const spineOff = useMotionValue(100000);
+  const spineOp = useMotionValue(0);
+  useMotionValueEvent(drawnLen, "change", (l) => {
+    const g = geomRef.current;
+    if (g) spineOff.set(Math.max(g.L - l, 0));
+  });
+
+  // Precompute the master path length + a monotone y→length lookup table,
+  // then arm the spine's dash reveal at the current (usually zero) progress.
+  useEffect(() => {
+    const el = masterRef.current;
+    if (!el) return;
+    const L = el.getTotalLength();
+    const N = 800;
+    const samples = [];
+    let my = 0;
+    for (let i = 0; i <= N; i++) {
+      const len = (L * i) / N;
+      const p = el.getPointAtLength(len);
+      my = Math.max(my, p.y);
+      samples.push([len, my]);
+    }
+    geomRef.current = { L, samples, el };
+    const p0 = Math.min(Math.max(scrollYProgress.get(), 0), 1);
+    maxP.current = Math.max(maxP.current, p0);
+    spineDash.set(L);
+    spineOff.set(Math.max(L - lookupLen(maxP.current * H), 0));
+    spineOp.set(1);
+    setReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The gold question label rides the pen tip of the master path.
   const penLeft = useTransform(drawnLen, (l) => {
@@ -415,12 +434,14 @@ export default function Survey() {
     });
   });
 
-  // Panel 8: seed + sprout, drawn strictly after the spine completes.
-  const seedOp = useTransform(prog, [0.928, 0.94], [0, 1]);
-  const stemLen = useTransform(prog, [0.945, 0.964], [0, 1]);
-  const leafLLen = useTransform(prog, [0.964, 0.981], [0, 1]);
-  const leafRLen = useTransform(prog, [0.981, 0.997], [0, 1]);
-  const wordOp = useTransform(prog, [0.965, 0.99], [0, 1]);
+  // Panel 8: seed + sprout, drawn strictly after the spine completes
+  // (the spine's deepest point maps to p ≈ 0.945; everything finishes by
+  // p = 0.99, comfortably reachable now that p runs to 1 at page bottom).
+  const seedOp = useTransform(prog, [0.94, 0.95], [0, 1]);
+  const stemLen = useTransform(prog, [0.95, 0.965], [0, 1]);
+  const leafLLen = useTransform(prog, [0.965, 0.978], [0, 1]);
+  const leafRLen = useTransform(prog, [0.978, 0.99], [0, 1]);
+  const wordOp = useTransform(prog, [0.96, 0.985], [0, 1]);
 
   const sproutStyle = (mv) => (rm ? undefined : { pathLength: mv });
 
@@ -641,15 +662,15 @@ export default function Survey() {
               rm
                 ? undefined
                 : {
-                    strokeDasharray: spineLen || 1,
-                    strokeDashoffset: dashOff,
-                    opacity: ready ? 1 : 0,
+                    strokeDasharray: spineDash,
+                    strokeDashoffset: spineOff,
+                    opacity: spineOp,
                   }
             }
           />
 
           {/* — panel 8: seed node, then the sprout drawn upward at full size — */}
-          <motion.circle cx="247" cy="5541" r="6" fill="none" stroke={TEAL} strokeWidth="2"
+          <motion.circle cx="243" cy="5739" r="6" fill="none" stroke={TEAL} strokeWidth="2"
             style={rm ? undefined : { opacity: seedOp }} />
           <g stroke={TEAL} strokeWidth="3" strokeLinecap="round" fill="none">
             <motion.path d={SPROUT_STEM} style={sproutStyle(stemLen)} />
@@ -731,11 +752,11 @@ export default function Survey() {
         {/* panel 8: the brand completes, then the CTA */}
         <motion.div
           className="survey-abs survey-wordmark"
-          style={{ left: pctX(0), top: pctY(5596), width: pctX(520), opacity: rm ? 1 : wordOp }}
+          style={{ left: pctX(0), top: pctY(5790), width: pctX(520), opacity: rm ? 1 : wordOp }}
         >
           <Logo height={36} />
         </motion.div>
-        <Annot x={30} y={5690} w={460} align="center">
+        <Annot x={30} y={5880} w={460} align="center">
           <motion.div
             className="survey-cta"
             initial={rm ? false : { opacity: 0, y: 10 }}
