@@ -9,6 +9,7 @@ import Logo from "../../components/Logo.jsx";
 import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE } from "../../copy.js";
 import { SECTION_VHS, PB, DEPTH_MARKS } from "./journey.js";
 import StaticTaproot from "./StaticTaproot.jsx";
+import HeatField from "./HeatField.jsx";
 
 const Scene = lazy(() => import("./Scene.jsx"));
 
@@ -221,14 +222,23 @@ function ScrollTaproot() {
         <Logo height={26} />
       </motion.header>
 
-      {/* 1 — HERO, above ground */}
+      {/* 1 — HERO: headline on white up top, the living heat band below (craft.wild.as-style) */}
       <Panel
         i={0}
         progress={scrollYProgress}
+        place="top"
         color="var(--ink)"
+        backdrop={
+          <>
+            <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: "48%", background: "#FFFFFF" }} />
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "52%", borderTop: "2px solid var(--ink)" }}>
+              <HeatField />
+            </div>
+          </>
+        }
         after={<div aria-hidden style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: "var(--ink)", opacity: 0.85, zIndex: 2 }} />}
       >
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "left", paddingTop: "4vh" }}>
           <span
             style={{
               display: "inline-block",
@@ -238,12 +248,12 @@ function ScrollTaproot() {
               padding: "7px 14px",
               border: "1px solid rgba(30,38,36,0.35)",
               borderRadius: 999,
-              marginBottom: 28,
+              marginBottom: 24,
             }}
           >
             {PANELS[0].badge}
           </span>
-          <H size="clamp(2.4rem, 6vw, 4.6rem)" style={{ maxWidth: "18ch" }}>
+          <H size="clamp(2.2rem, 4.8vw, 3.9rem)" style={{ maxWidth: "17ch", margin: 0 }}>
             {PANELS[0].text}
           </H>
         </div>
