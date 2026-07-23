@@ -19,8 +19,9 @@ function hash(i) {
   return x - Math.floor(x);
 }
 
-export default function HeatField() {
+export default function HeatField({ mode = "band" }) {
   const ref = useRef(null);
+  const isTrail = mode === "trail";
 
   useEffect(() => {
     const canvas = ref.current;
@@ -83,7 +84,7 @@ export default function HeatField() {
       tmp = new Float32Array(cols * rows);
       jit = new Float32Array(cols * rows);
       for (let i = 0; i < cols * rows; i++) jit[i] = (hash(i * 3.7) - 0.5) * 0.16;
-      seed();
+      if (!isTrail) seed();
       if (reduced) render();
     }
 
@@ -101,7 +102,23 @@ export default function HeatField() {
       }
     }
 
+    let lastScroll = window.scrollY, accShift = 0;
     function step() {
+      // trail cells stick to the CONTENT: shift the grid as the page scrolls
+      if (isTrail) {
+        accShift += (window.scrollY - lastScroll) / CELL;
+        lastScroll = window.scrollY;
+        const sh = Math.trunc(accShift);
+        if (sh !== 0) {
+          accShift -= sh;
+          tmp.fill(0);
+          for (let y = 0; y < rows; y++) {
+            const sy = y + sh;
+            if (sy >= 0 && sy < rows) tmp.set(heat.subarray(sy * cols, sy * cols + cols), y * cols);
+          }
+          const sw = heat; heat = tmp; tmp = sw;
+        }
+      }
       // diffuse
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
@@ -110,7 +127,7 @@ export default function HeatField() {
           const rr = heat[y * cols + Math.min(cols - 1, x + 1)];
           const u = heat[Math.max(0, y - 1) * cols + x];
           const d = heat[Math.min(rows - 1, y + 1) * cols + x];
-          tmp[i] = (heat[i] * (1 - DIFFUSE) + ((l + rr + u + d) / 4) * DIFFUSE) * DECAY;
+          tmp[i] = (heat[i] * (1 - DIFFUSE) + ((l + rr + u + d) / 4) * DIFFUSE) * (isTrail ? 0.986 : DECAY);
         }
       }
       const swap = heat; heat = tmp; tmp = swap;
@@ -127,7 +144,7 @@ export default function HeatField() {
       ptr.pcx = ptr.cx; ptr.pcy = ptr.cy;
 
       // simmer: the band never fully dies
-      if (frame % 3 === 0) {
+      if (!isTrail && frame % 3 === 0) {
         for (let k = 0; k < 3; k++) {
           const x = Math.floor(hash(frame * 13.7 + k * 101) * cols);
           const y = Math.floor(hash(frame * 7.3 + k * 53) * rows * 0.5);
@@ -139,16 +156,22 @@ export default function HeatField() {
     function render() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const c = CELL * dpr, gap = Math.max(1, Math.round(dpr));
-      // the ground is a faint grid: gap-colored wash, cells painted white on top
-      ctx.fillStyle = "#E7ECEB";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (isTrail) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      } else {
+        // the ground is a faint grid: gap-colored wash, cells painted white on top
+        ctx.fillStyle = "#E7ECEB";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
           const i = y * cols + x;
           const h = heat[i];
           if (h < VISIBLE_T) {
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(x * c, y * c, c - gap, c - gap);
+            if (!isTrail) {
+              ctx.fillStyle = "#FFFFFF";
+              ctx.fillRect(x * c, y * c, c - gap, c - gap);
+            }
             continue;
           }
           if (h > 0.98) ctx.fillStyle = CORE;

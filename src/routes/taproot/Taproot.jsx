@@ -202,6 +202,10 @@ function ScrollTaproot() {
           <Scene progress={scrollYProgress} bridge={bridge} />
         </Suspense>
       </div>
+      {/* droppable pixel trail: the cursor paints quantized cells anywhere on the page */}
+      <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none" }}>
+        <HeatField mode="trail" />
+      </div>
 
       {/* warm ground for germination */}
       <motion.div
@@ -236,7 +240,6 @@ function ScrollTaproot() {
             </div>
           </>
         }
-        after={<div aria-hidden style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: "var(--ink)", opacity: 0.85, zIndex: 2 }} />}
       >
         <div style={{ textAlign: "left", paddingTop: "4vh" }}>
           <span
