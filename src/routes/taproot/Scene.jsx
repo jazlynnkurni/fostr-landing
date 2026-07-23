@@ -135,6 +135,30 @@ function taperTube(curve, tubularSegments, radialSegments, radiusFn) {
   return g;
 }
 
+// Stationary ascii band: a full-width field of dots at the surface (does NOT flow, unlike
+// the river). Static per-cell brightness + static gaps; the band's top/bottom edges
+// dissolve (rising dropout via the plane's uv.y) so it reads as ground, not a hard bar.
+function makeGroundMaterial(hex) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(hex) }, uCell: { value: 6.0 }, uDot: { value: 0.34 }, uDrop: { value: 0.12 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform vec3 uColor; uniform float uCell; uniform float uDot; uniform float uDrop;
+      varying vec2 vUv;
+      float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+      void main(){
+        vec2 cell = floor(gl_FragCoord.xy / uCell);
+        vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
+        if (length(f) > uDot) discard;
+        float band = smoothstep(0.0, 0.42, vUv.y) * smoothstep(1.0, 0.58, vUv.y); // fade edges
+        float drop = mix(0.97, uDrop, band);
+        if (hash(cell * 0.61) < drop) discard;
+        float b = 0.82 + 0.18 * hash(cell);                    // static per-cell shade, no motion
+        gl_FragColor = vec4(mix(vec3(1.0), uColor, b), 1.0);
+      }`,
+  });
+}
+
 // The taproot: one slightly wandering curve from just above the horizon to the seed.
 const MAIN_PTS = [
   [0.0, 3.4, 0.0],   // the road begins at the very top, dead straight
@@ -218,6 +242,7 @@ function World({ progress, bridge }) {
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
+      ground: makeGroundMaterial("#357B7A"),
       root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0),
       branch: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12, 0.0),
@@ -480,6 +505,10 @@ function World({ progress, bridge }) {
       {/* soil gradient wall */}
       <mesh geometry={planeGeom} position={[0, 0, -4]}>
         <meshBasicMaterial vertexColors />
+      </mesh>
+      {/* stationary ascii ground band across the surface, full viewport width */}
+      <mesh position={[0, 0, -3.9]} material={mats.ground}>
+        <planeGeometry args={[120, 2.6]} />
       </mesh>
 
       {/* the taproot — the only saturated, emissive thing underground */}
