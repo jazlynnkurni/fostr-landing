@@ -62,7 +62,7 @@ export default function HeatField({ mode = "band" }) {
         }
       }
       const sorted = Array.from(vals).sort((a, b) => a - b);
-      const t0 = sorted[Math.floor(sorted.length * 0.42)];
+      const t0 = sorted[Math.floor(sorted.length * 0.5)];
       const t1 = sorted[sorted.length - 1];
       const span = Math.max(1e-4, t1 - t0);
       for (let y = 0; y < rows; y++) {
@@ -147,48 +147,51 @@ export default function HeatField({ mode = "band" }) {
       }
       ptr.pcx = ptr.cx; ptr.pcy = ptr.cy;
 
-      // simmer: the band never fully dies
-      if (!isTrail && frame % 3 === 0) {
-        for (let k = 0; k < 3; k++) {
-          const x = Math.floor(hash(frame * 13.7 + k * 101) * cols);
-          const y = Math.floor(hash(frame * 7.3 + k * 53) * rows * 0.5);
-          heat[y * cols + x] = Math.min(1, heat[y * cols + x] + 0.05);
-        }
-      }
     }
 
     function render() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       const c = CELLSZ * dpr, gap = Math.max(1, Math.round(dpr));
-      if (isTrail) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      } else {
-        // the ground is a faint grid: gap-colored wash, cells painted white on top
-        ctx.fillStyle = "#E7ECEB";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      const fadeFrom = rows * 0.62;                                     // ground dissolves into the world
       for (let y = 0; y < rows; y++) {
+        const rowA = isTrail ? 1 : y <= fadeFrom ? 1 : Math.max(0, 1 - (y - fadeFrom) / (rows - fadeFrom));
+        if (!isTrail && rowA > 0.004) {
+          // the ground is a faint grid: gap-colored row wash, cells painted white on top
+          ctx.globalAlpha = rowA;
+          ctx.fillStyle = "#E7ECEB";
+          ctx.fillRect(0, y * c, canvas.width, c);
+        }
         for (let x = 0; x < cols; x++) {
           const i = y * cols + x;
           const h = heat[i];
           if (h < VISIBLE_T) {
-            if (!isTrail) {
+            if (!isTrail && rowA > 0.004) {
               ctx.fillStyle = "#FFFFFF";
               ctx.fillRect(x * c, y * c, c - gap, c - gap);
             }
             continue;
           }
+          ctx.globalAlpha = isTrail ? 1 : Math.max(rowA, Math.min(1, h * 1.6));
           if (h > 0.98) ctx.fillStyle = CORE;
           else {
             const v = Math.min(0.999, Math.max(0, h + jit[i]));
-            let idx = Math.floor(Math.sqrt(v) * RAMP.length);          // mid heat holds mid color
-            const sp = hash(i * 9.1);
-            if (sp < 0.05) idx -= 3;                                    // chunky dark speckle
-            else if (sp > 0.96) idx += 2;                               // stray bright cells
+            // band biases light so the field stays calm; stray bright cells only, no dark pops
+            let idx = Math.floor((isTrail ? Math.sqrt(v) : 0.18 + Math.sqrt(v) * 0.78) * RAMP.length);
+            if (hash(i * 9.1) > 0.96) idx += 2;
             idx = Math.min(RAMP.length - 1, Math.max(0, idx));
             ctx.fillStyle = RAMP[idx];
           }
           ctx.fillRect(x * c, y * c, c - gap, c - gap);
+        }
+      }
+      ctx.globalAlpha = 1;
+      if (!isTrail) {
+        // the rule is pixels too: a dashed ink row along the band's top edge
+        ctx.fillStyle = "#1E2624";
+        const dh = Math.max(2 * dpr, c * 0.3);
+        for (let x = 0; x < cols; x++) {
+          if (hash(x * 7.7) < 0.85) ctx.fillRect(x * c, 0, c - gap, dh);
         }
       }
     }

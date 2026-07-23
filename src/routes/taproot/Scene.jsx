@@ -72,10 +72,10 @@ function makeDotMaterial(bias = 0.0, dot = 0.34, dropout = 0.06) {
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
         if (length(f) > uDot) discard;
         float tstep = floor(uTime * 7.0);
-        if (hash(cell + tstep * 0.61) < uDrop) discard;          // cells blink out: alive
+        if (hash(cell * 0.61) < uDrop) discard;                  // stable gaps, no blinking
         float pick = hash(cell * 1.7);                            // each cell owns a shade
         float fl = hash(cell + tstep * 1.37);                     // soft temporal flicker
-        float t = clamp(pick * 0.8 + uBias + fl * 0.18 - 0.05, 0.0, 1.0);
+        float t = clamp(pick * 0.8 + uBias + fl * 0.07 - 0.02, 0.0, 1.0);
         vec3 col = ramp(t);
         if (hash(cell * 3.1) > 0.968) col = vec3(0.886, 0.984, 0.965);  // stray mint cells
         gl_FragColor = vec4(col, 1.0);

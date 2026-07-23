@@ -1,4 +1,4 @@
-import{j as s,C as Me,u as ue,r as c,V as G,a as Y,p as fe,P as r,b as me,T as q,c as we,d as g,B as je,F as be,e as Ce,S as Be,f as p,g as J}from"./index-CaN7ivYd.js";const oe=new G,Ae=new g("#FFFFFF"),S=[[2,new g("#FFFFFF")],[.4,new g("#FAFCFC")],[-.8,new g("#ECF4F3")],[-3.5,new g("#DFECEB")],[-7.5,new g("#CCE2E1")],[-11.5,new g("#B8D7D6")],[-15.5,new g("#A5CCCB")],[-19.5,new g("#92C1C0")],[-23.5,new g("#84B8B7")],[-27,new g("#7DB2B1")]];function pe(h,y){if(h>=S[0][0])return y.copy(S[0][1]);for(let m=1;m<S.length;m++)if(h>=S[m][0]){const[F,b]=S[m-1],[C,B]=S[m];return y.copy(b).lerp(B,(F-h)/(F-C))}return y.copy(S[S.length-1][1])}function Q(h=0,y=.34,m=.06){return new Be({uniforms:{uBias:{value:h},uTime:{value:0},uCell:{value:6},uDot:{value:y},uDrop:{value:m}},vertexShader:"void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",fragmentShader:`
+import{j as s,C as Me,u as ue,r as c,V as G,a as Y,p as fe,P as r,b as me,T as q,c as we,d as g,B as je,F as be,e as Ce,S as Be,f as p,g as J}from"./index-B-VgUbCw.js";const oe=new G,Ae=new g("#FFFFFF"),S=[[2,new g("#FFFFFF")],[.4,new g("#FAFCFC")],[-.8,new g("#ECF4F3")],[-3.5,new g("#DFECEB")],[-7.5,new g("#CCE2E1")],[-11.5,new g("#B8D7D6")],[-15.5,new g("#A5CCCB")],[-19.5,new g("#92C1C0")],[-23.5,new g("#84B8B7")],[-27,new g("#7DB2B1")]];function pe(h,y){if(h>=S[0][0])return y.copy(S[0][1]);for(let m=1;m<S.length;m++)if(h>=S[m][0]){const[F,b]=S[m-1],[C,B]=S[m];return y.copy(b).lerp(B,(F-h)/(F-C))}return y.copy(S[S.length-1][1])}function Q(h=0,y=.34,m=.06){return new Be({uniforms:{uBias:{value:h},uTime:{value:0},uCell:{value:6},uDot:{value:y},uDrop:{value:m}},vertexShader:"void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",fragmentShader:`
       uniform float uBias; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop;
       float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       vec3 ramp(float t){
@@ -14,10 +14,10 @@ import{j as s,C as Me,u as ue,r as c,V as G,a as Y,p as fe,P as r,b as me,T as q
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
         if (length(f) > uDot) discard;
         float tstep = floor(uTime * 7.0);
-        if (hash(cell + tstep * 0.61) < uDrop) discard;          // cells blink out: alive
+        if (hash(cell * 0.61) < uDrop) discard;                  // stable gaps, no blinking
         float pick = hash(cell * 1.7);                            // each cell owns a shade
         float fl = hash(cell + tstep * 1.37);                     // soft temporal flicker
-        float t = clamp(pick * 0.8 + uBias + fl * 0.18 - 0.05, 0.0, 1.0);
+        float t = clamp(pick * 0.8 + uBias + fl * 0.07 - 0.02, 0.0, 1.0);
         vec3 col = ramp(t);
         if (hash(cell * 3.1) > 0.968) col = vec3(0.886, 0.984, 0.965);  // stray mint cells
         gl_FragColor = vec4(col, 1.0);

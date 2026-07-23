@@ -219,7 +219,7 @@ function ScrollTaproot() {
         backdrop={
           <>
             <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: "48%", background: "#FFFFFF" }} />
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "52%", borderTop: "2px solid var(--ink)" }}>
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "52%" }}>
               <HeatField />
             </div>
           </>
