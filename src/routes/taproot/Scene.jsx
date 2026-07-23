@@ -71,8 +71,10 @@ function makeDotMaterial(hex, dot = 0.34, dropout = 0.06) {
 
 // The taproot: one slightly wandering curve from just above the horizon to the seed.
 const MAIN_PTS = [
-  [0.0, 0.5, 0.0],
-  [-0.25, -2.2, 0.15],
+  [0.0, 3.4, 0.0],   // the road begins at the very top, dead straight
+  [0.0, 1.2, 0.0],
+  [0.0, -1.0, 0.0],
+  [-0.25, -2.8, 0.15], // only now does it start to wander
   [0.35, -4.6, -0.2],
   [-0.3, -7.2, 0.25],
   [0.3, -10.0, 0.0], // branch node (panel 4)
@@ -83,8 +85,8 @@ const MAIN_PTS = [
   [-0.15, -23.2, -0.1],
   [0.05, -25.2, 0.0], // the seed (panel 7)
 ];
-const NODE_INDEX = 4;
-const LATERAL_INDEX = 7;
+const NODE_INDEX = 6;
+const LATERAL_INDEX = 9;
 
 // Inverse lookup: world y -> fraction along the curve (y decreases monotonically).
 function fractionAtY(lut, y) {
@@ -100,8 +102,6 @@ function fractionAtY(lut, y) {
   }
   return 1;
 }
-
-const BANDS = [-2.3, -7.9, -13.7, -18.9, -23.3]; // faint sediment boundaries
 
 function World({ progress, bridge }) {
   const scene = useThree((s) => s.scene);
@@ -120,7 +120,7 @@ function World({ progress, bridge }) {
   const maxShoot = useRef(0);
   const lastPill = useRef("");
 
-  const { mainCurve, lut, node, latNode, seed, gPause } = useMemo(() => {
+  const { mainCurve, lut, node, latNode, seed, gPause, gFloor } = useMemo(() => {
     const pts = MAIN_PTS.map((p) => new THREE.Vector3(...p));
     const curve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
     const N = 512;
@@ -133,7 +133,9 @@ function World({ progress, bridge }) {
       latNode: pts[LATERAL_INDEX],
       seed: pts[pts.length - 1],
       // growth freezes at this fraction through panel 3 (stillness)
-      gPause: fractionAtY(table, piecewise(CAM_KEYS, PB[2]) - 1.6),
+      gPause: fractionAtY(table, piecewise(CAM_KEYS, PB[2]) - 3.4),
+      // the road is already on the page at load: from the top down past the horizon
+      gFloor: fractionAtY(table, -1.4),
     };
   }, []);
 
@@ -272,9 +274,9 @@ function World({ progress, bridge }) {
       sc.fog.color.copy(sc.background);
     }
 
-    // ---- root growth: tracks the camera, pauses for panel 3, never un-grows
-    let g = fractionAtY(lut, camY - 1.6);
-    if (p < PB[3]) g = Math.min(g, gPause);
+    // ---- root growth: leads ahead of the camera so the road is always followable
+    let g = Math.max(fractionAtY(lut, camY - 3.4), gFloor);
+    if (p < PB[3]) g = Math.min(g, Math.max(gPause, gFloor));
     g = Math.max(b.maxG, Math.min(g, 1));
     b.maxG = g;
     if (rootRef.current) rootRef.current.geometry.setDrawRange(0, Math.floor(g * 360) * 48);
@@ -337,9 +339,9 @@ function World({ progress, bridge }) {
     if (els.pill) {
       let pillText = "";
       let pillO = 0;
-      if (PANELS[ai].tooltip && local > 0.72) {
+      if (PANELS[ai].tooltip && local > 0.4) {
         pillText = PANELS[ai].tooltip;
-        pillO = clamp01((local - 0.72) / 0.12);
+        pillO = clamp01((local - 0.4) / 0.1);
         b.pillTarget = ai + 1;
       } else if (ai > 0 && PANELS[ai - 1].tooltip && local < 0.1) {
         pillText = PANELS[ai - 1].tooltip;
@@ -405,18 +407,6 @@ function World({ progress, bridge }) {
       <mesh geometry={planeGeom} position={[0, 0, -4]}>
         <meshBasicMaterial vertexColors />
       </mesh>
-      {/* thin dark horizon line */}
-      <mesh position={[0, 0.02, -3.9]}>
-        <planeGeometry args={[90, 0.08]} />
-        <meshBasicMaterial color="#1E2624" />
-      </mesh>
-      {/* faint sediment bands doubling as panel markers */}
-      {BANDS.map((y, i) => (
-        <mesh key={i} position={[0, y, -3.92]}>
-          <planeGeometry args={[90, 0.07]} />
-          <meshBasicMaterial color="#FFFFFF" transparent opacity={0.35} depthWrite={false} />
-        </mesh>
-      ))}
 
       {/* the taproot — the only saturated, emissive thing underground */}
       <mesh ref={rootRef} geometry={rootGeom} material={mats.root} />
