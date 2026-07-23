@@ -10,21 +10,21 @@ import { PB, CAM_KEYS, piecewise, clamp01 } from "./journey.js";
 import { PANELS } from "../../copy.js";
 
 const V = new THREE.Vector3();
-const WARM = new THREE.Color("#2E2418"); // panel-8 daylight-adjacent warmth
+const WARM = new THREE.Color("#FFFFFF"); // panel-8 lift back toward daylight
 
-// Vertical fog ramp keyed on camera depth: paper -> umber -> soil -> bedrock.
-// Mirrors the CSS tokens --paper --umber --soil --bedrock in src/index.css.
+// Vertical ramp keyed on camera depth: white daylight -> soft turquoise at depth.
+// Deliberately restrained: the deepest stop is a muted #5DA1A1-family teal, not full sat.
 const BG_STOPS = [
-  [2.0, new THREE.Color("#F7F5F1")],
-  [0.4, new THREE.Color("#F2EEE6")],
-  [-0.8, new THREE.Color("#96795C")],
-  [-3.5, new THREE.Color("#8A6F55")],
-  [-7.5, new THREE.Color("#5E4A38")],
-  [-11.5, new THREE.Color("#463829")],
-  [-15.5, new THREE.Color("#3E322A")],
-  [-19.5, new THREE.Color("#2A211C")],
-  [-23.5, new THREE.Color("#191412")],
-  [-27.0, new THREE.Color("#191412")],
+  [2.0, new THREE.Color("#FFFFFF")],
+  [0.4, new THREE.Color("#FAFCFC")],
+  [-0.8, new THREE.Color("#ECF4F3")],
+  [-3.5, new THREE.Color("#DFECEB")],
+  [-7.5, new THREE.Color("#CCE2E1")],
+  [-11.5, new THREE.Color("#B8D7D6")],
+  [-15.5, new THREE.Color("#A5CCCB")],
+  [-19.5, new THREE.Color("#92C1C0")],
+  [-23.5, new THREE.Color("#84B8B7")],
+  [-27.0, new THREE.Color("#7DB2B1")],
 ];
 
 function rampColor(y, out) {
@@ -37,6 +37,34 @@ function rampColor(y, out) {
     }
   }
   return out.copy(BG_STOPS[BG_STOPS.length - 1][1]);
+}
+
+// Dotted "ascii" material: the root renders as a screen-space grid of dots with a
+// gentle per-cell flicker, so the line reads as live signal rather than solid pipe.
+// Gaps use discard (no blending), which keeps edges crisp at any DPR.
+function makeDotMaterial(hex, dot = 0.34, dropout = 0.06) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(hex) },
+      uTime: { value: 0 },
+      uCell: { value: 6.0 },
+      uDot: { value: dot },
+      uDrop: { value: dropout },
+    },
+    vertexShader: `void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop;
+      float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+      void main(){
+        vec2 cell = floor(gl_FragCoord.xy / uCell);
+        vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
+        if (length(f) > uDot) discard;
+        float tstep = floor(uTime * 7.0);
+        if (hash(cell + tstep * 0.61) < uDrop) discard;          // cells blink out: alive
+        float b = 0.82 + 0.18 * hash(cell + tstep * 1.37);       // per-cell brightness jitter
+        gl_FragColor = vec4(mix(vec3(1.0), uColor, b), 1.0);
+      }`,
+  });
 }
 
 // The taproot: one slightly wandering curve from just above the horizon to the seed.
@@ -107,7 +135,19 @@ function World({ progress, bridge }) {
     };
   }, []);
 
-  const rootGeom = useMemo(() => new THREE.TubeGeometry(mainCurve, 280, 0.12, 8, false), [mainCurve]);
+  const rootGeom = useMemo(() => new THREE.TubeGeometry(mainCurve, 360, 0.115, 8, false), [mainCurve]);
+
+  // Dotted flicker materials (deep teal on the pale turquoise world).
+  const mats = useMemo(
+    () => ({
+      root: makeDotMaterial("#1F5A59", 0.36),
+      branch: makeDotMaterial("#357B7A", 0.34),
+      lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12),
+      shoot: makeDotMaterial("#357B7A", 0.34),
+    }),
+    []
+  );
+  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
 
   // Branch endpoints depend on viewport aspect so the four cards stay on screen
   // (2x2 on narrow phones, 4 across on desktop). Bucketed to avoid rebuild churn.
@@ -195,15 +235,20 @@ function World({ progress, bridge }) {
   }, [lut, mainCurve, node, latNode]);
 
   useEffect(() => {
-    scene.background = new THREE.Color("#F7F5F1");
-    scene.fog = new THREE.Fog(new THREE.Color("#F7F5F1"), 5.5, 17);
+    scene.background = new THREE.Color("#FFFFFF");
+    scene.fog = new THREE.Fog(new THREE.Color("#FFFFFF"), 7, 26); // pushed back: sharper root
     return () => {
       scene.fog = null;
       scene.background = null;
     };
   }, [scene]);
 
-  useFrame(({ camera, scene: sc, size: sz }) => {
+  useFrame(({ camera, scene: sc, size: sz, clock }) => {
+    const tNow = clock.elapsedTime;
+    mats.root.uniforms.uTime.value = tNow;
+    mats.branch.uniforms.uTime.value = tNow;
+    mats.lateral.uniforms.uTime.value = tNow;
+    mats.shoot.uniforms.uTime.value = tNow;
     const b = bridge.current;
     const p = clamp01(progress.get());
     b.p = p;
@@ -230,7 +275,7 @@ function World({ progress, bridge }) {
     if (p < PB[3]) g = Math.min(g, gPause);
     g = Math.max(b.maxG, Math.min(g, 1));
     b.maxG = g;
-    if (rootRef.current) rootRef.current.geometry.setDrawRange(0, Math.floor(g * 280) * 48);
+    if (rootRef.current) rootRef.current.geometry.setDrawRange(0, Math.floor(g * 360) * 48);
 
     const tip = mainCurve.getPointAt(Math.max(g, 0.001));
     if (tipRef.current) {
@@ -367,68 +412,60 @@ function World({ progress, bridge }) {
       {BANDS.map((y, i) => (
         <mesh key={i} position={[0, y, -3.92]}>
           <planeGeometry args={[90, 0.07]} />
-          <meshBasicMaterial color="#B99B74" transparent opacity={0.16} depthWrite={false} />
+          <meshBasicMaterial color="#FFFFFF" transparent opacity={0.35} depthWrite={false} />
         </mesh>
       ))}
 
       {/* the taproot — the only saturated, emissive thing underground */}
-      <mesh ref={rootRef} geometry={rootGeom}>
-        <meshBasicMaterial color="#5DA1A1" />
-      </mesh>
+      <mesh ref={rootRef} geometry={rootGeom} material={mats.root} />
       {/* growth-tip glow */}
       <mesh ref={tipRef} scale={0.001}>
         <sphereGeometry args={[0.2, 12, 12]} />
-        <meshBasicMaterial color="#A8D8D3" transparent opacity={0.5} depthWrite={false} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={0.65} depthWrite={false} />
       </mesh>
       {/* node spheres */}
       {nodes.map((n, i) => (
         <mesh key={`n${i}`} ref={(el) => (nodeRefs.current[i] = el)} position={n.pos} scale={0.001}>
           <sphereGeometry args={[n.r, 12, 12]} />
-          <meshBasicMaterial color="#5DA1A1" />
+          <meshBasicMaterial color="#1F5A59" />
         </mesh>
       ))}
 
       {/* four bright filaments to the four documents */}
       {branchStuff.geoms.map((g2, i) => (
-        <mesh key={`b${aBucket}-${i}`} ref={(el) => (branchRefs.current[i] = el)} geometry={g2}>
-          <meshBasicMaterial color="#7CC4BF" />
-        </mesh>
+        <mesh key={`b${aBucket}-${i}`} ref={(el) => (branchRefs.current[i] = el)} geometry={g2} material={mats.branch} />
       ))}
       {branchStuff.endpoints.map((e, i) => (
         <mesh key={`e${aBucket}-${i}`} ref={(el) => (endSphereRefs.current[i] = el)} position={e} scale={0.001}>
           <sphereGeometry args={[0.09, 10, 10]} />
-          <meshBasicMaterial color="#7CC4BF" />
+          <meshBasicMaterial color="#357B7A" />
         </mesh>
       ))}
 
       {/* dim lateral galleries — present, not yet lit */}
       {lateralGeoms.map((g2, i) => (
-        <mesh key={`l${i}`} ref={(el) => (lateralRefs.current[i] = el)} geometry={g2}>
-          <meshBasicMaterial color="#3E5A57" transparent opacity={0.65} />
-        </mesh>
+        <mesh key={`l${i}`} ref={(el) => (lateralRefs.current[i] = el)} geometry={g2} material={mats.lateral} />
       ))}
 
       {/* the trace light that runs back UP the root (panel 5) */}
       <group ref={traceRef} visible={false}>
         <mesh>
           <sphereGeometry args={[0.13, 12, 12]} />
-          <meshBasicMaterial color="#EAF6F3" />
+          <meshBasicMaterial color="#FFFFFF" />
         </mesh>
         <mesh>
           <sphereGeometry args={[0.3, 12, 12]} />
-          <meshBasicMaterial color="#9FD4CF" transparent opacity={0.3} depthWrite={false} />
+          <meshBasicMaterial color="#1F5A59" transparent opacity={0.25} depthWrite={false} />
         </mesh>
       </group>
 
       {/* the seed: the least rendered thing on the page. No glow, no jewel. */}
       <mesh position={seed}>
         <sphereGeometry args={[0.085, 12, 12]} />
-        <meshBasicMaterial color="#2E241C" />
+        <meshBasicMaterial color="#173D3C" />
       </mesh>
       {/* germination shoot */}
-      <mesh ref={shootRef} geometry={shootGeom}>
-        <meshBasicMaterial color="#7CC4BF" />
-      </mesh>
+      <mesh ref={shootRef} geometry={shootGeom} material={mats.shoot} />
     </>
   );
 }
@@ -436,7 +473,7 @@ function World({ progress, bridge }) {
 export default function Scene({ progress, bridge }) {
   return (
     <Canvas
-      dpr={[1, 1.5]}
+      dpr={[1, 2]}
       camera={{ fov: 50, near: 0.1, far: 60, position: [0, 1.8, 7] }}
       gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
       style={{ position: "absolute", inset: 0 }}

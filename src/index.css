@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/inter";
 
 /* Fostr brand + depth palette (see BRIEF.md and docs/concepts.md constants) */
 :root {
@@ -11,6 +12,7 @@
   --bedrock: #191412;
   --gold: #C9A227;        /* reserved: tooltip questions + panel 7 */
   --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-inter: "Inter Variable", Inter, system-ui, sans-serif;
 }
 html { scroll-behavior: auto; }
 body { margin: 0; font-family: var(--font-sans); background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }

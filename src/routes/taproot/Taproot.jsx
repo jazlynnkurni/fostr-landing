@@ -12,7 +12,7 @@ import StaticTaproot from "./StaticTaproot.jsx";
 
 const Scene = lazy(() => import("./Scene.jsx"));
 
-const mono = { fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' };
+const mono = { fontFamily: "var(--font-inter)", fontWeight: 600 };
 
 const overlayCard = {
   position: "absolute",
@@ -20,13 +20,13 @@ const overlayCard = {
   top: 0,
   visibility: "hidden",
   opacity: 0,
-  background: "rgba(20,16,13,0.66)",
-  border: "1px solid rgba(247,245,241,0.16)",
+  background: "rgba(255,255,255,0.85)",
+  border: "1px solid rgba(30,38,36,0.12)",
   borderRadius: 10,
   padding: "12px 14px",
-  color: "var(--paper)",
+  color: "var(--ink)",
   backdropFilter: "blur(5px)",
-  boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
+  boxShadow: "0 8px 28px rgba(23,58,57,0.16)",
   willChange: "transform, opacity",
 };
 
@@ -35,7 +35,7 @@ function Bars({ n = 3 }) {
   return (
     <div aria-hidden>
       {Array.from({ length: n }).map((_, i) => (
-        <div key={i} style={{ height: 6, width: widths[i % 3], background: "rgba(247,245,241,0.2)", borderRadius: 3, marginBottom: 6 }} />
+        <div key={i} style={{ height: 6, width: widths[i % 3], background: "rgba(30,38,36,0.14)", borderRadius: 3, marginBottom: 6 }} />
       ))}
     </div>
   );
@@ -56,7 +56,7 @@ function usePrefersReducedMotion() {
 
 // One scroll panel: a section of SECTION_VHS[i] vh with a sticky full-viewport inner
 // frame. Headline opacity/y scrub off the single page progress value (no re-renders).
-function Panel({ i, progress, place = "center", color = "#F1EBE2", backdrop, after, children }) {
+function Panel({ i, progress, place = "center", color = "var(--ink)", backdrop, after, children }) {
   const a = PB[i];
   const bEnd = PB[i + 1];
   const keys = i === 0 ? [0, 0.001, bEnd - 0.02, bEnd - 0.002] : [a + 0.004, a + 0.03, bEnd - 0.02, bEnd - 0.002];
@@ -90,7 +90,7 @@ function Panel({ i, progress, place = "center", color = "#F1EBE2", backdrop, aft
               ...mono,
               fontSize: 10,
               letterSpacing: "0.3em",
-              color: "rgba(247,245,241,0.4)",
+              color: "rgba(30,38,36,0.42)",
             }}
           >
             {DEPTH_MARKS[i]}
@@ -104,7 +104,7 @@ function Panel({ i, progress, place = "center", color = "#F1EBE2", backdrop, aft
 }
 
 const H = ({ children, size = "clamp(2rem, 5.2vw, 3.9rem)", style }) => (
-  <h2 style={{ fontWeight: 800, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.02em", margin: "0 auto", ...style }}>{children}</h2>
+  <h2 style={{ fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.02em", margin: "0 auto", ...style }}>{children}</h2>
 );
 
 // Form sheets fossilized in the soil wall (panel 2): the same fields on every one.
@@ -128,17 +128,17 @@ function FossilSheet({ f, progress }) {
         width: f.w,
         y,
         rotate: f.rot,
-        background: "rgba(247,245,241,0.05)",
-        border: "1px solid rgba(247,245,241,0.14)",
+        background: "rgba(255,255,255,0.55)",
+        border: "1px solid rgba(30,38,36,0.14)",
         borderRadius: 6,
         padding: "12px 14px",
-        color: "rgba(247,245,241,0.55)",
+        color: "rgba(30,38,36,0.55)",
       }}
     >
       {["Name", "DOB", "Placement"].map((field) => (
         <div key={field} style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 9 }}>
           <span style={{ ...mono, fontSize: 9, letterSpacing: "0.08em" }}>{field}</span>
-          <span style={{ flex: 1, borderBottom: "1px dotted rgba(247,245,241,0.3)" }} />
+          <span style={{ flex: 1, borderBottom: "1px dotted rgba(30,38,36,0.3)" }} />
         </div>
       ))}
     </motion.div>
@@ -180,7 +180,7 @@ function ScrollTaproot() {
   };
 
   // Masthead flips from ink to paper as the horizon crosses.
-  const mastheadColor = useTransform(scrollYProgress, [PB[1] * 0.7, PB[1] * 1.3], ["#1E2624", "#F7F5F1"]);
+  const mastheadColor = useTransform(scrollYProgress, [0, 1], ["#1E2624", "#1E2624"]);
   // Panel 8: daylight-adjacent warmth rising from the ground.
   const warmO = useTransform(scrollYProgress, [PB[7] + 0.02, 0.98], [0, 1]);
   // The shoot resolves into the two-leaf sprout glyph, drawn stroke by stroke.
@@ -194,7 +194,7 @@ function ScrollTaproot() {
   };
 
   return (
-    <main style={{ position: "relative", background: "var(--paper)" }}>
+    <main style={{ position: "relative", background: "#FFFFFF", fontFamily: "var(--font-inter)" }}>
       {/* fixed 3D borehole behind everything */}
       <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
         <Suspense fallback={null}>
@@ -212,7 +212,7 @@ function ScrollTaproot() {
           pointerEvents: "none",
           opacity: warmO,
           background:
-            "radial-gradient(120% 90% at 50% 100%, rgba(201,162,39,0.16) 0%, rgba(138,111,85,0.2) 34%, rgba(25,20,18,0) 70%)",
+            "radial-gradient(120% 90% at 50% 100%, rgba(255,255,255,0.9) 0%, rgba(236,244,243,0.55) 38%, rgba(255,255,255,0) 70%)",
         }}
       />
 
@@ -295,8 +295,8 @@ function ScrollTaproot() {
         <div style={{ textAlign: "center" }}>
           <H style={{ maxWidth: "30ch" }}>{PANELS[5].text}</H>
           <div style={{ marginTop: 48 }}>
-            <div aria-hidden style={{ width: 1, height: 34, background: "rgba(247,245,241,0.35)", margin: "0 auto 14px" }} />
-            <div style={{ ...mono, fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(247,245,241,0.75)" }}>
+            <div aria-hidden style={{ width: 1, height: 34, background: "rgba(30,38,36,0.3)", margin: "0 auto 14px" }} />
+            <div style={{ ...mono, fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(30,38,36,0.65)" }}>
               {BUSINESS_LINE}
             </div>
           </div>
@@ -304,10 +304,10 @@ function ScrollTaproot() {
       </Panel>
 
       {/* 7 — the seed. The least rendered thing on the page. Near-silence. */}
-      <Panel i={6} progress={scrollYProgress} color="#CFC5B8">
+      <Panel i={6} progress={scrollYProgress} color="var(--ink)">
         <div style={{ maxWidth: "34ch", margin: "0 auto" }}>
           <p style={{ fontWeight: 400, fontSize: 17, lineHeight: 1.7, margin: 0 }}>{PANELS[6].text}</p>
-          <p style={{ color: "var(--gold)", fontSize: 13, marginTop: 22 }}>{`— ${PANELS[6].attribution}`}</p>
+          <p style={{ color: "#8F7119", fontSize: 13, marginTop: 22 }}>{`— ${PANELS[6].attribution}`}</p>
         </div>
       </Panel>
 
@@ -341,7 +341,7 @@ function ScrollTaproot() {
             <a
               href="#"
               onClick={(e) => e.preventDefault()}
-              style={{ border: "1px solid rgba(247,245,241,0.45)", color: "var(--paper)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
+              style={{ border: "1px solid rgba(30,38,36,0.35)", color: "var(--ink)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
             >
               {PANELS[7].secondary}
             </a>
@@ -386,7 +386,7 @@ function ScrollTaproot() {
           style={{
             ...overlayCard,
             width: "min(400px, 84vw)",
-            background: "rgba(20,16,13,0.78)",
+            background: "rgba(255,255,255,0.92)",
             borderLeft: "2px solid var(--teal)",
             borderRadius: "6px 10px 10px 6px",
             padding: "12px 16px",

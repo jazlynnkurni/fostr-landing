@@ -5,9 +5,9 @@ import Logo from "../../components/Logo.jsx";
 import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE } from "../../copy.js";
 import { DEPTH_MARKS } from "./journey.js";
 
-const mono = { fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' };
+const mono = { fontFamily: "var(--font-inter)", fontWeight: 600 };
 
-const BGS = ["#F7F5F1", "#7A614B", "#5E4A38", "#4A3A2C", "#3E322A", "#2A211C", "#191412", "#221A13"];
+const BGS = ["#1E2624", "#7A614B", "#B8D7D6", "#4A3A2C", "#DFECEB", "#ECF4F3", "#FFFFFF", "#221A13"];
 const FGS = ["#1E2624", "#F1EBE2", "#F1EBE2", "#F1EBE2", "#F1EBE2", "#F1EBE2", "#CFC5B8", "#F1EBE2"];
 
 const ROOT_X = "clamp(20px, 6vw, 64px)";
@@ -41,7 +41,7 @@ function Caption({ text }) {
         display: "inline-block",
         marginTop: 40,
         background: "var(--gold)",
-        color: "#191412",
+        color: "#FFFFFF",
         borderRadius: 999,
         padding: "8px 16px",
         fontWeight: 700,
@@ -86,8 +86,8 @@ const h2Style = {
 };
 
 const cardStyle = {
-  background: "rgba(20,16,13,0.5)",
-  border: "1px solid rgba(247,245,241,0.16)",
+  background: "rgba(255,255,255,0.5)",
+  border: "1px solid rgba(30,38,36,0.16)",
   borderRadius: 10,
   padding: "14px 16px",
 };
@@ -97,7 +97,7 @@ function Bars({ n = 3 }) {
   return (
     <div aria-hidden>
       {Array.from({ length: n }).map((_, i) => (
-        <div key={i} style={{ height: 6, width: widths[i % 3], background: "rgba(247,245,241,0.2)", borderRadius: 3, marginBottom: 6 }} />
+        <div key={i} style={{ height: 6, width: widths[i % 3], background: "rgba(30,38,36,0.2)", borderRadius: 3, marginBottom: 6 }} />
       ))}
     </div>
   );
@@ -140,7 +140,7 @@ export default function StaticTaproot() {
               {["Name", "DOB", "Placement"].map((f) => (
                 <div key={f} style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
                   <span style={{ ...mono, fontSize: 10, opacity: 0.7 }}>{f}</span>
-                  <span style={{ flex: 1, borderBottom: "1px dotted rgba(247,245,241,0.35)" }} />
+                  <span style={{ flex: 1, borderBottom: "1px dotted rgba(30,38,36,0.35)" }} />
                 </div>
               ))}
             </div>
@@ -196,8 +196,8 @@ export default function StaticTaproot() {
           <span>elder care</span>
         </div>
         <div style={{ marginTop: 44 }}>
-          <div aria-hidden style={{ width: 1, height: 30, background: "rgba(247,245,241,0.35)", marginBottom: 12 }} />
-          <div style={{ ...mono, fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(247,245,241,0.75)" }}>
+          <div aria-hidden style={{ width: 1, height: 30, background: "rgba(30,38,36,0.35)", marginBottom: 12 }} />
+          <div style={{ ...mono, fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(30,38,36,0.75)" }}>
             {BUSINESS_LINE}
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function StaticTaproot() {
           <a
             href="#"
             onClick={(e) => e.preventDefault()}
-            style={{ border: "1px solid rgba(247,245,241,0.45)", color: "var(--paper)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
+            style={{ border: "1px solid rgba(30,38,36,0.45)", color: "var(--paper)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
           >
             {PANELS[7].secondary}
           </a>
