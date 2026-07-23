@@ -21,7 +21,7 @@ PB[PB.length - 1] = 1;
 // Camera y keyframes over scroll progress. Descent slows almost to a stop for
 // panel 3 (stillness) and panel 5 (the trace), and settles at the seed for 7/8.
 export const CAM_KEYS = [
-  [0, 1.8],
+  [0, 7.0],
   [PB[1], 0.2],
   [PB[2], -5.2],
   [PB[3], -6.2],

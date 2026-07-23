@@ -9,7 +9,6 @@ import Logo from "../../components/Logo.jsx";
 import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE } from "../../copy.js";
 import { SECTION_VHS, PB } from "./journey.js";
 import StaticTaproot from "./StaticTaproot.jsx";
-import HeatField from "./HeatField.jsx";
 
 const Scene = lazy(() => import("./Scene.jsx"));
 
@@ -186,10 +185,6 @@ function ScrollTaproot() {
           <Scene progress={scrollYProgress} bridge={bridge} />
         </Suspense>
       </div>
-      {/* droppable pixel trail: the cursor paints quantized cells anywhere on the page */}
-      <div aria-hidden style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none" }}>
-        <HeatField mode="trail" />
-      </div>
 
       {/* warm ground for germination */}
       <motion.div
@@ -210,23 +205,14 @@ function ScrollTaproot() {
         <Logo height={26} />
       </motion.header>
 
-      {/* 1 — HERO: headline on white up top, the living heat band below (craft.wild.as-style) */}
+      {/* 1 — HERO, above ground */}
       <Panel
         i={0}
         progress={scrollYProgress}
-        place="top"
         color="var(--ink)"
-        backdrop={
-          <>
-            <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: "48%", background: "#FFFFFF" }} />
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: "52%" }}>
-              <HeatField />
-            </div>
-          </>
-        }
       >
-        <div style={{ textAlign: "left", paddingTop: "4vh" }}>
-          <H size="clamp(2.2rem, 4.8vw, 3.9rem)" style={{ maxWidth: "17ch", margin: 0 }}>
+        <div style={{ textAlign: "center" }}>
+          <H size="clamp(2.4rem, 6vw, 4.6rem)" style={{ maxWidth: "18ch" }}>
             {PANELS[0].text}
           </H>
         </div>

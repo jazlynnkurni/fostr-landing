@@ -42,14 +42,12 @@ function rampColor(y, out) {
 // Dotted "ascii" material: the root renders as a screen-space grid of dots with a
 // gentle per-cell flicker, so the line reads as live signal rather than solid pipe.
 // Gaps use discard (no blending), which keeps edges crisp at any DPR.
-// Mosaic "ascii" material: the root renders as a screen-space grid of dots, each
-// cell picking its own shade from the heat-field's turquoise ladder (with stray
-// bright mint cells and a soft flicker), so root and heat band share one material
-// language. Gaps use discard, which keeps edges crisp at any DPR.
-function makeDotMaterial(bias = 0.0, dot = 0.34, dropout = 0.06) {
+// Dotted "ascii" material: the root renders as a screen-space grid of dots with a
+// gentle shade shimmer. Gaps are static (no blinking); discard keeps edges crisp.
+function makeDotMaterial(hex, dot = 0.34, dropout = 0.06) {
   return new THREE.ShaderMaterial({
     uniforms: {
-      uBias: { value: bias },
+      uColor: { value: new THREE.Color(hex) },
       uTime: { value: 0 },
       uCell: { value: 6.0 },
       uDot: { value: dot },
@@ -57,28 +55,16 @@ function makeDotMaterial(bias = 0.0, dot = 0.34, dropout = 0.06) {
     },
     vertexShader: `void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `
-      uniform float uBias; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop;
+      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop;
       float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-      vec3 ramp(float t){
-        if (t < 0.18) return vec3(0.078, 0.227, 0.224);   // #143A39
-        if (t < 0.38) return vec3(0.114, 0.318, 0.314);   // #1D5150
-        if (t < 0.58) return vec3(0.165, 0.424, 0.420);   // #2A6C6B
-        if (t < 0.74) return vec3(0.239, 0.522, 0.518);   // #3D8584
-        if (t < 0.88) return vec3(0.365, 0.631, 0.631);   // #5DA1A1
-        return vec3(0.514, 0.733, 0.729);                 // #83BBBA
-      }
       void main(){
         vec2 cell = floor(gl_FragCoord.xy / uCell);
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
         if (length(f) > uDot) discard;
-        float tstep = floor(uTime * 7.0);
         if (hash(cell * 0.61) < uDrop) discard;                  // stable gaps, no blinking
-        float pick = hash(cell * 1.7);                            // each cell owns a shade
-        float fl = hash(cell + tstep * 1.37);                     // soft temporal flicker
-        float t = clamp(pick * 0.8 + uBias + fl * 0.07 - 0.02, 0.0, 1.0);
-        vec3 col = ramp(t);
-        if (hash(cell * 3.1) > 0.968) col = vec3(0.886, 0.984, 0.965);  // stray mint cells
-        gl_FragColor = vec4(col, 1.0);
+        float tstep = floor(uTime * 7.0);
+        float b = 0.9 + 0.1 * hash(cell + tstep * 1.37);         // gentle brightness shimmer
+        gl_FragColor = vec4(mix(vec3(1.0), uColor, b), 1.0);
       }`,
   });
 }
@@ -156,10 +142,10 @@ function World({ progress, bridge }) {
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
-      root: makeDotMaterial(0.0, 0.36),
-      branch: makeDotMaterial(0.18, 0.34),
-      lateral: makeDotMaterial(0.34, 0.26, 0.12),
-      shoot: makeDotMaterial(0.18, 0.34),
+      root: makeDotMaterial("#1F5A59", 0.36),
+      branch: makeDotMaterial("#357B7A", 0.34),
+      lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12),
+      shoot: makeDotMaterial("#357B7A", 0.34),
     }),
     []
   );
