@@ -12,6 +12,12 @@ import { PANELS } from "../../copy.js";
 const V = new THREE.Vector3();
 const WARM = new THREE.Color("#FFFFFF"); // panel-8 lift back toward daylight
 
+// The hero "soil block": a full-width dotted band sitting just below the headline.
+// The root pipeline hangs from its underside — soil on top, roots beneath.
+const SOIL_Y = 2.1;   // world-y of the band centre — sits at the white/gray horizon
+const SOIL_H = 0.9;   // band thickness in world units
+const SOIL_W = 17;    // wider than the frame at z=0, so it spans edge to edge
+
 // Vertical ramp keyed on camera depth: white daylight -> soft turquoise at depth.
 // Deliberately restrained: the deepest stop is a muted #5DA1A1-family teal, not full sat.
 const BG_STOPS = [
@@ -76,9 +82,9 @@ function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0, clipTop = 
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
         if (length(f) > uDot) discard;
 
-        // Above the horizon the physics waterfall owns the frame: the 3D root only
-        // renders underground, dithering out through a soft band at the surface.
-        float fade = smoothstep(uClipTop, uClipTop - 1.6, vWY);
+        // The root only exists below the soil block: clip anything above the surface,
+        // dithering out over a short band so it emerges from the block's underside.
+        float fade = smoothstep(uClipTop, uClipTop - 0.5, vWY);
         if (fade < 0.02 || hash(cell * 1.7 + 4.0) > fade) discard;
 
         float head = uHead * smoothstep(0.30, 0.16, vLen);       // faster flow up high
@@ -215,17 +221,22 @@ function World({ progress, bridge }) {
 
   const rootGeom = useMemo(
     () =>
-      taperTube(mainCurve, 360, 8, () => 0.1), // constant river; the physics waterfall is the hero
+      taperTube(mainCurve, 360, 8, () => 0.1), // thin root pipeline hanging from the soil block
     [mainCurve]
   );
+
+  const soilGeom = useMemo(() => new THREE.PlaneGeometry(SOIL_W, SOIL_H), []);
 
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
-      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0, 0.4), // clip above the surface; waterfall owns the sky
+      // root only renders below the soil block (clipTop), emerging from its underside
+      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0, SOIL_Y - SOIL_H * 0.5 + 0.08),
       branch: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12, 0.0),
       shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
+      // the soil block: a dense, near-static dotted band, same teal family as the root
+      soil: makeDotMaterial("#2E6E6D", 0.46, 0.015, 0.0),
     }),
     []
   );
@@ -331,6 +342,7 @@ function World({ progress, bridge }) {
     mats.branch.uniforms.uTime.value = tNow;
     mats.lateral.uniforms.uTime.value = tNow;
     mats.shoot.uniforms.uTime.value = tNow;
+    mats.soil.uniforms.uTime.value = tNow;
     const b = bridge.current;
     const p = clamp01(progress.get());
     b.p = p;
@@ -485,6 +497,9 @@ function World({ progress, bridge }) {
       <mesh geometry={planeGeom} position={[0, 0, -4]}>
         <meshBasicMaterial vertexColors />
       </mesh>
+
+      {/* the hero soil block — a full-width dotted band the root hangs from */}
+      <mesh geometry={soilGeom} material={mats.soil} position={[0, SOIL_Y, 0]} />
 
       {/* the taproot — the only saturated, emissive thing underground */}
       <mesh ref={rootRef} geometry={rootGeom} material={mats.root} />
