@@ -288,6 +288,65 @@ function FossilSheet({ f, progress }) {
   );
 }
 
+// Reactive pixel grid filling the hero's white space: a quiet turquoise dot grid
+// where dots near the cursor brighten, swell and push away — the ascii-root aesthetic,
+// made interactive. Fades out above the meadow and as the page scrolls underground.
+function ReactiveGrid() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const hex = (getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1").match(/[0-9a-f]{2}/gi) || ["5d", "a1", "a1"];
+    const m = hex.map((h) => parseInt(h, 16));
+    let W = 0, H = 0, raf = 0, t = 0, last = performance.now(), scrollO = 1;
+    const mouse = { x: -1e4, y: -1e4, has: false };
+    const move = (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.has = true; };
+    const leave = () => { mouse.has = false; };
+    const resize = () => { W = window.innerWidth; H = window.innerHeight; canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = W + "px"; canvas.style.height = H + "px"; };
+    const onScroll = () => { const f = window.scrollY / Math.max(1, window.innerHeight); scrollO = 1 - Math.min(1, Math.max(0, (f - 0.12) / 0.5)); };
+    resize(); onScroll();
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerleave", leave);
+    window.addEventListener("resize", resize);
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    function loop(now) {
+      raf = requestAnimationFrame(loop);
+      t += (now - last) / 1000; last = now;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      if (scrollO <= 0.01) return;
+      const step = 30, R = 165;
+      for (let y = step; y < H; y += step) {
+        const vy = 1 - Math.max(0, (y - H * 0.6) / (H * 0.28)); // fade out before the meadow
+        if (vy <= 0) continue;
+        for (let x = step; x < W; x += step) {
+          const d = mouse.has ? Math.hypot(x - mouse.x, y - mouse.y) : 9e9;
+          const k = Math.max(0, 1 - d / R);
+          const wob = Math.sin(t * 1.1 + x * 0.02 + y * 0.02) * 0.5 + 0.5;
+          const r = 1.1 + k * 3.4;
+          const al = (0.07 + k * 0.55 + wob * 0.025) * vy * scrollO;
+          const dx = k ? ((x - mouse.x) / d) * k * 6 : 0;
+          const dy = k ? ((y - mouse.y) / d) * k * 6 : 0;
+          ctx.fillStyle = `rgba(${m[0]},${m[1]},${m[2]},${al})`;
+          ctx.fillRect(x + dx - r / 2, y + dy - r / 2, r, r);
+        }
+      }
+    }
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerleave", leave);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+  return <canvas ref={ref} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none" }} />;
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -344,6 +403,9 @@ function ScrollTaproot() {
           <Scene progress={scrollYProgress} bridge={bridge} />
         </Suspense>
       </div>
+
+      {/* interactive pixel grid in the hero's white space */}
+      <ReactiveGrid />
 
       {/* warm ground for germination */}
       <motion.div
