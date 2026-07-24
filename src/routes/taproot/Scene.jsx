@@ -165,6 +165,42 @@ function makePlantMaterial(hex) {
   });
 }
 
+// Pixels seeping down out of the soil: a screen-space dot grid whose density fades
+// with depth (dense at uTop -> gone by uTop - uSpan), with a slow downward-drifting
+// density wave so the soil looks like it's bleeding pixels into the earth.
+function makeSeepMaterial(hex, top, span) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(hex) },
+      uTime: { value: 0 },
+      uCell: { value: 6.0 },
+      uDot: { value: 0.44 },
+      uTop: { value: top },
+      uSpan: { value: span },
+    },
+    vertexShader: `
+      varying float vWY;
+      void main(){ vWY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uTop; uniform float uSpan;
+      varying float vWY;
+      float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+      void main(){
+        vec2 cell = floor(gl_FragCoord.xy / uCell);
+        vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
+        if (length(f) > uDot) discard;
+        float depth = clamp((uTop - vWY) / uSpan, 0.0, 1.0);   // 0 at surface -> 1 deep
+        float keep = pow(1.0 - depth, 1.6);                    // sparser with depth
+        keep *= 0.72 + 0.28 * sin((vWY * 2.4 - uTime * 1.8));  // downward-drifting waves
+        if (hash(cell * 0.7) > keep) discard;
+        float jit = hash(cell);
+        float t = 0.4 + 0.34 * jit + 0.08 * sin(uTime * 1.4 + jit * 6.283);
+        vec3 col = mix(uColor * 0.45, uColor, t);
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+}
+
 // ---- procedural wild-meadow silhouettes -------------------------------------
 // Plants are built from tiny filled triangles (stems as thin quads, flower heads
 // as blobs, seed-spikes/petals/leaflets as little segments) so they read like a
@@ -422,31 +458,12 @@ function World({ progress, bridge }) {
   }, []);
   useEffect(() => () => garden.forEach((p) => p.geom.dispose()), [garden]);
 
-  // Delicate roots fanning from the soil's underside: they spread wide across the
-  // width just below the surface, then curve inward and converge toward the central
-  // taproot — so the surface -> root hand-off reads as a natural root system leading
-  // the eye down, not one stiff pipe cutting to the next section.
-  const fanRoots = useMemo(() => {
-    const ySurf = SOIL_Y - SOIL_H * 0.5;
-    const N = 24;
-    const arr = [];
-    for (let i = 0; i < N; i++) {
-      const R = mulberry(9001 + i * 131);
-      const f = (i / (N - 1)) * 2 - 1;                         // -1..1 across the width
-      const xs = f * (6.0 + R() * 0.6) + (R() - 0.5) * 0.35;
-      const depth = 0.9 + R() * 2.2 + (1 - Math.abs(f)) * 2.6; // centre roots reach deeper
-      const wob = (R() - 0.5) * 1.0;
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(xs, ySurf + 0.06, (R() - 0.5) * 0.4),
-        new THREE.Vector3(xs * 0.72 + wob, ySurf - depth * 0.38, 0.16),
-        new THREE.Vector3(xs * 0.32, ySurf - depth * 0.74, 0.06),
-        new THREE.Vector3(xs * 0.06, ySurf - depth, 0.0),      // converge toward centre
-      ]);
-      arr.push({ geom: taperTube(curve, 64, 6, (u) => 0.05 * (1 - u) * (1 - u) + 0.006), endY: ySurf - depth });
-    }
-    return arr;
-  }, []);
-  useEffect(() => () => fanRoots.forEach((r) => r.geom.dispose()), [fanRoots]);
+  // Below the soil block the pixels SEEP downward — a dotted field that starts dense
+  // at the underside and dithers out with depth (with a gentle downward-drifting
+  // density wave), so the soil dissolves naturally into the earth and leaves room for
+  // the next-section transition. Not roots — just soil bleeding through.
+  const SEEP_H = 4.2;
+  const seepGeom = useMemo(() => new THREE.PlaneGeometry(SOIL_W, SEEP_H), []);
 
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
@@ -460,8 +477,8 @@ function World({ progress, bridge }) {
       shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       // the soil block: a dense, near-static dotted band, same teal family as the root
       soil: makeDotMaterial("#2E6E6D", 0.46, 0.015, 0.0),
-      // delicate fanning surface roots — sparser (higher dropout) so they read fine
-      fan: makeDotMaterial("#2E6E6D", 0.32, 0.14, 0.0),
+      // pixels seeping down out of the soil, dithering out with depth
+      seep: makeSeepMaterial("#2E6E6D", SOIL_Y - SOIL_H * 0.5, SEEP_H),
       // dithered, wind-swayed pixel plants on top of the soil
       plant: makePlantMaterial("#2E6E6D"),
     }),
@@ -574,7 +591,7 @@ function World({ progress, bridge }) {
     mats.lateral.uniforms.uTime.value = tNow;
     mats.shoot.uniforms.uTime.value = tNow;
     mats.soil.uniforms.uTime.value = tNow;
-    mats.fan.uniforms.uTime.value = tNow;
+    mats.seep.uniforms.uTime.value = tNow;
     mats.plant.uniforms.uTime.value = tNow;
     const b = bridge.current;
     const p = clamp01(progress.get());
@@ -739,10 +756,8 @@ function World({ progress, bridge }) {
         <mesh key={`plant${i}`} geometry={p.geom} material={mats.plant} position={[p.x, p.y, p.z]} scale={p.scale} />
       ))}
 
-      {/* delicate roots fanning from the soil underside, converging to the taproot */}
-      {fanRoots.map((r, i) => (
-        <mesh key={`fan${i}`} geometry={r.geom} material={mats.fan} />
-      ))}
+      {/* pixels seeping down out of the soil, dithering out with depth */}
+      <mesh geometry={seepGeom} material={mats.seep} position={[0, SOIL_Y - SOIL_H * 0.5 - SEEP_H * 0.5, -0.05]} />
 
       {/* the taproot — the only saturated, emissive thing underground.
           No spheres anywhere: the root is JUST the dotted tube (jaz will add
