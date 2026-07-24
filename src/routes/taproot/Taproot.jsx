@@ -604,11 +604,14 @@ function ScrollTaproot() {
         </div>
       </Panel>
 
-      {/* 7 — the seed. The least rendered thing on the page. Near-silence. */}
+      {/* 7 — the founder: Jaden, in his own words + portrait */}
       <Panel i={6} progress={scrollYProgress} color="var(--ink)">
-        <div style={{ maxWidth: "34ch", margin: "0 auto" }}>
-          <p style={{ fontWeight: 400, fontSize: 17, lineHeight: 1.7, margin: 0 }}>{PANELS[6].text}</p>
-          <p style={{ color: "#8F7119", fontSize: 13, marginTop: 22, fontStyle: "italic" }}>{PANELS[6].attribution}</p>
+        <div style={{ maxWidth: "min(1000px, 92vw)", margin: "0 auto" }}>
+          <img
+            src="/jaden.png"
+            alt={`${PANELS[6].attribution}: ${PANELS[6].text}`}
+            style={{ width: "100%", height: "auto", display: "block", borderRadius: 16, boxShadow: "0 20px 64px rgba(23,58,57,0.20)" }}
+          />
         </div>
       </Panel>
 
