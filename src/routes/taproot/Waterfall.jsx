@@ -12,7 +12,7 @@ const { Engine, Composite, Bodies, Body } = Matter;
 const RAMP = ["#2A6C6B", "#3D8584", "#5DA1A1", "#83BBBA", "#AFD7D5"];
 const CORE = "#DFF9F3";
 const CELL = 9;        // css px per ascii cell
-const MAX = 1100;      // particle cap (wide full-width sheet needs more water)
+const MAX = 1500;      // particle cap (edge-to-edge sheet needs more water)
 
 export default function Waterfall() {
   const ref = useRef(null);
@@ -46,11 +46,11 @@ export default function Waterfall() {
       mouthY = H * 0.42;          // safely below the top-anchored headline
       outletY = H * 0.70;
       chuteEndY = H * 0.88;
-      mouthHalf = W * 0.46;       // spread nearly port-to-port, then converge to center
+      mouthHalf = W * 0.54;       // walls sit past the viewport edges: water fills edge-to-edge
       outletHalf = Math.max(W * 0.02, 22);
       emitY = mouthY - 24;
-      emitHalf = mouthHalf * 0.97; // rain across the whole width
-      emitRate = Math.max(6, Math.round(emitHalf / 26)); // more emitters across a wider sheet
+      emitHalf = W * 0.5;         // rain from the very left edge to the very right edge
+      emitRate = Math.max(8, Math.round(emitHalf / 24)); // more emitters across the full width
     }
 
     function buildWalls() {
