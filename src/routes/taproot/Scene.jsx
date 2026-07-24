@@ -110,6 +110,110 @@ function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0, clipTop = 
   });
 }
 
+// A miniature garden on top of the soil: dithered pixel silhouettes of little plants
+// and trees that sway in the breeze. Same screen-space dot grid as the root, but the
+// silhouette is stippled by an ordered (Bayer) dither, and each plant bends in the wind
+// via a per-vertex sway weighted to its height (base planted, tips move most).
+function makePlantMaterial(hex) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: {
+      uColor: { value: new THREE.Color(hex) },
+      uTime: { value: 0 },
+      uCell: { value: 6.0 },
+      uDot: { value: 0.42 },
+      uFill: { value: 0.86 }, // dither density: 1 = solid, lower = more stipple holes
+      uSwayAmp: { value: 0.13 },
+      uSwaySpeed: { value: 1.1 },
+    },
+    vertexShader: `
+      attribute float aWeight; attribute float aPhase;
+      uniform float uTime; uniform float uSwayAmp; uniform float uSwaySpeed;
+      void main(){
+        vec3 p = position;
+        float w = aWeight * aWeight;                       // tips bend far more than the base
+        float wind = sin(uTime * uSwaySpeed + aPhase) * 0.72
+                   + sin(uTime * uSwaySpeed * 2.1 + aPhase * 1.7) * 0.28;
+        p.x += wind * uSwayAmp * w;
+        p.y -= abs(wind) * uSwayAmp * 0.25 * w;            // slight nod as it leans
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor; uniform float uCell; uniform float uDot; uniform float uFill;
+      float bayer2(vec2 a){ a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
+      float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+      float bayer8(vec2 a){ return bayer4(0.5 * a) * 0.25 + bayer2(a); }
+      void main(){
+        vec2 cell = floor(gl_FragCoord.xy / uCell);
+        vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
+        if (length(f) > uDot) discard;                     // dot grid
+        if (bayer8(cell) > uFill) discard;                 // ordered dither stipple
+        gl_FragColor = vec4(uColor, 1.0);
+      }`,
+  });
+}
+
+// Little silhouette outlines (all rooted at y=0, growing up). Returns a THREE.Shape.
+function plantShape(kind) {
+  const s = new THREE.Shape();
+  if (kind === 0) {
+    // round "lollipop" tree: slim trunk flaring into a bushy canopy
+    s.moveTo(-0.05, 0);
+    s.lineTo(-0.05, 0.5);
+    s.bezierCurveTo(-0.5, 0.52, -0.44, 1.28, 0, 1.32);
+    s.bezierCurveTo(0.44, 1.28, 0.5, 0.52, 0.05, 0.5);
+    s.lineTo(0.05, 0);
+  } else if (kind === 1) {
+    // conifer: stacked triangular tiers on a short trunk
+    s.moveTo(-0.05, 0);
+    s.lineTo(-0.05, 0.22);
+    s.lineTo(-0.34, 0.22);
+    s.lineTo(-0.17, 0.58);
+    s.lineTo(-0.26, 0.58);
+    s.lineTo(-0.12, 0.94);
+    s.lineTo(0, 1.24);
+    s.lineTo(0.12, 0.94);
+    s.lineTo(0.26, 0.58);
+    s.lineTo(0.17, 0.58);
+    s.lineTo(0.34, 0.22);
+    s.lineTo(0.05, 0.22);
+    s.lineTo(0.05, 0);
+  } else if (kind === 2) {
+    // small shrub: a low rounded mound
+    s.moveTo(-0.3, 0);
+    s.bezierCurveTo(-0.36, 0.4, -0.2, 0.62, 0, 0.6);
+    s.bezierCurveTo(0.2, 0.62, 0.36, 0.4, 0.3, 0);
+  } else {
+    // grass tuft: three thin blades
+    s.moveTo(-0.16, 0);
+    s.lineTo(-0.02, 0.62);
+    s.lineTo(-0.08, 0.02);
+    s.lineTo(0.02, 0.66);
+    s.lineTo(0.03, 0.02);
+    s.lineTo(0.14, 0.5);
+    s.lineTo(0.16, 0);
+  }
+  return s;
+}
+
+// Build a plant geometry from a shape, baking per-vertex sway weight (height fraction)
+// and a constant wind phase so many plants can share one material.
+function makePlantGeom(kind, phase) {
+  const g = new THREE.ShapeGeometry(plantShape(kind), 14);
+  const pos = g.attributes.position;
+  let maxY = 0.001;
+  for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
+  const weight = new Float32Array(pos.count);
+  const ph = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    weight[i] = Math.min(1, pos.getY(i) / maxY);
+    ph[i] = phase;
+  }
+  g.setAttribute("aWeight", new THREE.BufferAttribute(weight, 1));
+  g.setAttribute("aPhase", new THREE.BufferAttribute(ph, 1));
+  return g;
+}
+
 // Variable-radius tube built to match TubeGeometry's index layout (so setDrawRange math
 // is unchanged): a wide waterfall mouth at the top (u->0) narrowing into the river.
 function taperTube(curve, tubularSegments, radialSegments, radiusFn) {
@@ -227,10 +331,24 @@ function World({ progress, bridge }) {
 
   const soilGeom = useMemo(() => new THREE.PlaneGeometry(SOIL_W, SOIL_H), []);
 
+  // The miniature garden: little plants + trees scattered along the soil-block top,
+  // each with its own type, scale and wind phase.
+  const garden = useMemo(() => {
+    const topY = SOIL_Y + SOIL_H * 0.5 - 0.04; // rooted just into the block's top edge
+    const xs = [-5.0, -3.9, -3.0, -1.9, -1.0, 0.2, 1.3, 2.2, 3.2, 4.2, 5.1];
+    return xs.map((x, i) => {
+      const kind = [1, 3, 0, 2, 3, 0, 2, 1, 3, 0, 2][i % 11];
+      const phase = (i * 1.7) % 6.283;
+      const scale = 0.55 + ((i * 37) % 55) / 100; // 0.55..1.1, deterministic-ish
+      return { geom: makePlantGeom(kind, phase), x, y: topY, scale };
+    });
+  }, []);
+  useEffect(() => () => garden.forEach((p) => p.geom.dispose()), [garden]);
+
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
-      // root only renders below the soil block: clipTop is set so the 0.5-unit dither
+      // root only renders below the soil block: clipTop is set so the 0.5-unit fade
       // band lands INSIDE the block, and the root is already full density at the block's
       // underside — no sparse gap, no white space between soil and root.
       root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0, SOIL_Y - SOIL_H * 0.5 + 0.6),
@@ -239,6 +357,8 @@ function World({ progress, bridge }) {
       shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       // the soil block: a dense, near-static dotted band, same teal family as the root
       soil: makeDotMaterial("#2E6E6D", 0.46, 0.015, 0.0),
+      // dithered, wind-swayed pixel plants on top of the soil
+      plant: makePlantMaterial("#2E6E6D"),
     }),
     []
   );
@@ -347,6 +467,7 @@ function World({ progress, bridge }) {
     mats.lateral.uniforms.uTime.value = tNow;
     mats.shoot.uniforms.uTime.value = tNow;
     mats.soil.uniforms.uTime.value = tNow;
+    mats.plant.uniforms.uTime.value = tNow;
     const b = bridge.current;
     const p = clamp01(progress.get());
     b.p = p;
@@ -505,30 +626,19 @@ function World({ progress, bridge }) {
       {/* the hero soil block — a full-width dotted band the root hangs from */}
       <mesh geometry={soilGeom} material={mats.soil} position={[0, SOIL_Y, 0]} />
 
-      {/* the taproot — the only saturated, emissive thing underground */}
-      <mesh ref={rootRef} geometry={rootGeom} material={mats.root} />
-      {/* growth-tip glow */}
-      <mesh ref={tipRef} scale={0.001}>
-        <sphereGeometry args={[0.2, 12, 12]} />
-        <meshBasicMaterial color="#FFFFFF" transparent opacity={0.65} depthWrite={false} />
-      </mesh>
-      {/* node spheres */}
-      {nodes.map((n, i) => (
-        <mesh key={`n${i}`} ref={(el) => (nodeRefs.current[i] = el)} position={n.pos} scale={0.001}>
-          <sphereGeometry args={[n.r, 12, 12]} />
-          <meshBasicMaterial color="#1F5A59" />
-        </mesh>
+      {/* a miniature garden of dithered pixel plants swaying on top of the soil */}
+      {garden.map((p, i) => (
+        <mesh key={`plant${i}`} geometry={p.geom} material={mats.plant} position={[p.x, p.y, 0.05]} scale={p.scale} />
       ))}
 
-      {/* four bright filaments to the four documents */}
+      {/* the taproot — the only saturated, emissive thing underground.
+          No spheres anywhere: the root is JUST the dotted tube (jaz will add
+          pixelized balls travelling *within* the root as a separate effect). */}
+      <mesh ref={rootRef} geometry={rootGeom} material={mats.root} />
+
+      {/* four dotted filaments to the four documents */}
       {branchStuff.geoms.map((g2, i) => (
         <mesh key={`b${aBucket}-${i}`} ref={(el) => (branchRefs.current[i] = el)} geometry={g2} material={mats.branch} />
-      ))}
-      {branchStuff.endpoints.map((e, i) => (
-        <mesh key={`e${aBucket}-${i}`} ref={(el) => (endSphereRefs.current[i] = el)} position={e} scale={0.001}>
-          <sphereGeometry args={[0.09, 10, 10]} />
-          <meshBasicMaterial color="#357B7A" />
-        </mesh>
       ))}
 
       {/* dim lateral galleries — present, not yet lit */}
@@ -536,23 +646,6 @@ function World({ progress, bridge }) {
         <mesh key={`l${i}`} ref={(el) => (lateralRefs.current[i] = el)} geometry={g2} material={mats.lateral} />
       ))}
 
-      {/* the trace light that runs back UP the root (panel 5) */}
-      <group ref={traceRef} visible={false}>
-        <mesh>
-          <sphereGeometry args={[0.13, 12, 12]} />
-          <meshBasicMaterial color="#FFFFFF" />
-        </mesh>
-        <mesh>
-          <sphereGeometry args={[0.3, 12, 12]} />
-          <meshBasicMaterial color="#1F5A59" transparent opacity={0.25} depthWrite={false} />
-        </mesh>
-      </group>
-
-      {/* the seed: the least rendered thing on the page. No glow, no jewel. */}
-      <mesh position={seed}>
-        <sphereGeometry args={[0.085, 12, 12]} />
-        <meshBasicMaterial color="#173D3C" />
-      </mesh>
       {/* germination shoot */}
       <mesh ref={shootRef} geometry={shootGeom} material={mats.shoot} />
     </>
