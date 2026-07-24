@@ -115,22 +115,25 @@ function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0, clipTop = 
 // silhouette is stippled by an ordered (Bayer) dither, and each plant bends in the wind
 // via a per-vertex sway weighted to its height (base planted, tips move most).
 function makePlantMaterial(hex) {
+  // Same dotted teal material as the soil/root: identical dot grid, brightness ramp
+  // (dark -> base -> mint) and travelling flow shimmer, so the meadow reads as the
+  // SAME substance as the soil it grows from — plus a per-vertex wind sway.
   return new THREE.ShaderMaterial({
-    transparent: true,
     side: THREE.DoubleSide, // hand-built triangles have mixed winding; draw both faces
     uniforms: {
       uColor: { value: new THREE.Color(hex) },
       uTime: { value: 0 },
-      uCell: { value: 4.0 },  // finer grid so thin stems/spokes survive
-      uDot: { value: 0.62 },  // fatter dots -> solid silhouette, still pixelized
-      uFill: { value: 0.94 }, // dither density: 1 = solid, lower = more stipple holes
+      uCell: { value: 6.0 },   // match the soil's dot grid exactly
+      uDot: { value: 0.46 },   // match the soil's dot size
       uSwayAmp: { value: 0.12 },
       uSwaySpeed: { value: 1.05 },
     },
     vertexShader: `
       attribute float aWeight; attribute float aPhase;
       uniform float uTime; uniform float uSwayAmp; uniform float uSwaySpeed;
+      varying float vFlow;
       void main(){
+        vFlow = position.y;                                // shimmer travels up the stems
         vec3 p = position;
         float w = aWeight * aWeight;                       // tips bend far more than the base
         float wind = sin(uTime * uSwaySpeed + aPhase) * 0.72
@@ -140,16 +143,24 @@ function makePlantMaterial(hex) {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       }`,
     fragmentShader: `
-      uniform vec3 uColor; uniform float uCell; uniform float uDot; uniform float uFill;
-      float bayer2(vec2 a){ a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
-      float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
-      float bayer8(vec2 a){ return bayer4(0.5 * a) * 0.25 + bayer2(a); }
+      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot;
+      varying float vFlow;
+      const float TAU = 6.28318530718;
+      float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       void main(){
         vec2 cell = floor(gl_FragCoord.xy / uCell);
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
-        if (length(f) > uDot) discard;                     // dot grid
-        if (bayer8(cell) > uFill) discard;                 // ordered dither stipple
-        gl_FragColor = vec4(uColor, 1.0);
+        if (length(f) > uDot) discard;
+        float jit = hash(cell);
+        // two travelling wave-trains (same feel as the soil/root), running up the plant
+        float w1 = 0.5 + 0.5 * sin((vFlow * 7.0 - uTime * 1.2 + jit) * TAU);
+        float w2 = 0.5 + 0.5 * sin((vFlow * 3.0 - uTime * 0.66 + jit * 0.7) * TAU);
+        float flow = w1 * 0.62 + w2 * 0.38;
+        float t = clamp(0.18 + flow * 0.72 + 0.12, 0.0, 1.0);
+        vec3 dark = uColor * 0.4;
+        vec3 light = mix(uColor, vec3(0.90, 0.99, 0.96), 0.72);
+        vec3 col = t < 0.5 ? mix(dark, uColor, t * 2.0) : mix(uColor, light, (t - 0.5) * 2.0);
+        gl_FragColor = vec4(col, 1.0);
       }`,
   });
 }
