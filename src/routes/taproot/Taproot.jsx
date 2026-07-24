@@ -99,7 +99,7 @@ const H = ({ children, size = "clamp(2rem, 5.2vw, 3.9rem)", style }) => (
 // A straight 2px turquoise line strung across the negative space between "reaches"
 // and "a kid". It spans the live gap each frame, so as the rubber-band words pull
 // apart the line grows, and as they close it shrinks and is engulfed when they meet.
-function StringLink({ leftRef, rightRef, startDelay = 1900 }) {
+function StringLink({ leftRef, rightRef }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -107,7 +107,6 @@ function StringLink({ leftRef, rightRef, startDelay = 1900 }) {
     const ctx = canvas.getContext("2d");
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let raf = 0;
-    const t0 = performance.now();
     const teal = getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1";
 
     function resize() {
@@ -119,7 +118,7 @@ function StringLink({ leftRef, rightRef, startDelay = 1900 }) {
     resize();
     window.addEventListener("resize", resize);
 
-    function loop(now) {
+    function loop() {
       raf = requestAnimationFrame(loop);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const L = leftRef.current?.getBoundingClientRect();
@@ -127,18 +126,17 @@ function StringLink({ leftRef, rightRef, startDelay = 1900 }) {
       if (!L || !R) return;
       const ax = L.right, ay = L.top + L.height * 0.55, bx = R.left, by = R.top + R.height * 0.55;
       const gap = Math.hypot(bx - ax, by - ay);
-      // The line simply spans the live gap. As the words close it shrinks, and when
-      // they meet it's engulfed — no opacity fade, it just runs out of room.
-      if (gap < 7) return;
-      const vis = Math.min(1, Math.max(0, (now - t0 - startDelay) / 320));
-      if (vis <= 0) return;
+      // Only draw once the words are spread past their resting gap; fades in with the
+      // spread and is engulfed as they rubber-band back together.
+      const a = Math.min(1, Math.max(0, (gap - 28) / 34));
+      if (a <= 0.01) return;
       ctx.save();
       ctx.scale(dpr, dpr);
       ctx.beginPath();
       ctx.moveTo(ax, ay);
       ctx.lineTo(bx, by);
       ctx.strokeStyle = teal;
-      ctx.globalAlpha = vis;
+      ctx.globalAlpha = a;
       ctx.lineWidth = 2;
       ctx.lineCap = "round";
       ctx.stroke();
@@ -146,7 +144,7 @@ function StringLink({ leftRef, rightRef, startDelay = 1900 }) {
     }
     raf = requestAnimationFrame(loop);
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
-  }, [leftRef, rightRef, startDelay]);
+  }, [leftRef, rightRef]);
 
   // Portal to <body>: a position:fixed canvas inside the hero's transformed wrapper
   // would be offset by that transform. At the top level, fixed == viewport, so the
@@ -157,27 +155,25 @@ function StringLink({ leftRef, rightRef, startDelay = 1900 }) {
   );
 }
 
-// The "Reach" (rubber-band): once the line has landed, "never reaches" and "a kid"
-// — both undistorted — get pulled apart until "never" sits under "Most" and "kid"
-// under "day" (measured from the first line's rendered width), then snap back and
-// overshoot into a damped bounce. A turquoise string strung between them goes taut
-// on the pull and folds on the release. Loops slowly.
-function ElasticReach({ left, right, p1Ref }) {
+// The "Reach" (rubber-band) — now HOVER-driven: hovering the line spreads "never
+// reaches" and "a kid" apart until "never" sits under "Most" and "kid" under "day"
+// (measured from line-1's rendered width), with a turquoise line drawn taut across
+// the gap. On leave they spring back and rubber-band into place. Both words stay
+// undistorted; only the space between them moves.
+function ElasticReach({ left, right, p1Ref, active }) {
   const leftRef = useRef(null);
   const rightRef = useRef(null);
-  // pull.l / pull.r = px each chunk travels to reach the line-1 edges; total = rope length
-  const [pull, setPull] = useState({ l: -150, r: 150, total: 320 });
+  // pull.l / pull.r = spread distance; pull.touch = how far each moves inward on recoil
+  // so they just BUMP (a ~2px gap) instead of overlapping.
+  const [pull, setPull] = useState({ l: -150, r: 150, touch: 4 });
   useEffect(() => {
     const measure = () => {
       const P = p1Ref.current?.getBoundingClientRect();
       const L = leftRef.current?.getBoundingClientRect();
       const R = rightRef.current?.getBoundingClientRect();
       if (!P || !L || !R || P.width < 4) return;
-      const l = P.left - L.left;   // move "never" left edge to "Most" left edge (negative)
-      const r = P.right - R.right;  // move "kid" right edge to "day" right edge (positive)
-      const restGap = Math.max(2, R.left - L.right);
-      // base fold length (floor); the string otherwise tracks the live gap each frame.
-      setPull({ l, r, total: Math.max(48, restGap * 3) });
+      const restGap = R.left - L.right;
+      setPull({ l: P.left - L.left, r: P.right - R.right, touch: Math.max(0, (restGap - 2) / 2) });
     };
     measure();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
@@ -186,24 +182,21 @@ function ElasticReach({ left, right, p1Ref }) {
     return () => { clearTimeout(id); window.removeEventListener("resize", measure); };
   }, [p1Ref]);
 
-  const t = {
-    duration: 3.4,
-    times: [0, 0.42, 0.64, 0.8, 0.9],
-    ease: ["easeOut", "easeIn", "easeOut", "easeInOut"],
-    repeat: Infinity,
-    repeatDelay: 0.6,
-    delay: 2.0,
-  };
+  // enter: smooth spring spread. leave: recoil that bumps to just-touching (never
+  // crossing) then settles — [null] keeps the start from wherever it currently is.
+  const enter = { type: "spring", stiffness: 130, damping: 20, mass: 0.9 };
+  const recoil = { duration: 0.5, times: [0, 0.58, 1], ease: ["easeIn", "easeOut"] };
+  const trans = active ? enter : recoil;
   return (
     <span style={{ whiteSpace: "nowrap" }}>
-      <motion.span ref={leftRef} style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, pull.l, 6, -2.5, 0] }} transition={t}>
+      <motion.span ref={leftRef} style={{ display: "inline-block" }} animate={{ x: active ? pull.l : [null, pull.touch, 0] }} transition={trans}>
         {left}
       </motion.span>
       {" "}
-      <motion.span ref={rightRef} style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, pull.r, -6, 2.5, 0] }} transition={t}>
+      <motion.span ref={rightRef} style={{ display: "inline-block" }} animate={{ x: active ? pull.r : [null, -pull.touch, 0] }} transition={trans}>
         {right}
       </motion.span>
-      <StringLink leftRef={leftRef} rightRef={rightRef} total={pull.total} />
+      <StringLink leftRef={leftRef} rightRef={rightRef} />
     </span>
   );
 }
@@ -216,6 +209,7 @@ function HeroLine({ text }) {
   const leftChunk = cut > 0 ? p2.slice(0, cut) : p2;
   const rightChunk = cut > 0 ? p2.slice(cut).trimStart() : "";
   const p1Ref = useRef(null);
+  const [active, setActive] = useState(false);
   const base = {
     fontFamily: "var(--font-sans)",
     fontWeight: 500, // both lines medium
@@ -228,7 +222,7 @@ function HeroLine({ text }) {
       <div style={{ textAlign: "center" }}>
         <motion.span
           ref={p1Ref}
-          style={{ display: "inline-block", fontWeight: 500 }}
+          style={{ display: "inline-block" }}
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: 0.12 }}
@@ -238,12 +232,14 @@ function HeroLine({ text }) {
       </div>
       {p2 && (
         <motion.div
-          style={{ textAlign: "center" }}
+          style={{ textAlign: "center", cursor: "default" }}
+          onPointerEnter={() => setActive(true)}
+          onPointerLeave={() => setActive(false)}
           initial={{ opacity: 0, y: -44 }}
-          animate={{ opacity: 0.9, y: 3 }}
-          transition={{ duration: 0.9, ease: [0.22, 1, 0.34, 1], delay: 0.95 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.34, 1], delay: 0.6 }}
         >
-          <ElasticReach left={leftChunk} right={rightChunk} p1Ref={p1Ref} />
+          <ElasticReach left={leftChunk} right={rightChunk} p1Ref={p1Ref} active={active} />
         </motion.div>
       )}
     </h2>
@@ -318,7 +314,7 @@ function ReactiveGrid() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       if (scrollO <= 0.01) return;
-      const step = 30, R = 165;
+      const step = 30, R = 195;
       for (let y = step; y < H; y += step) {
         const vy = 1 - Math.max(0, (y - H * 0.6) / (H * 0.28)); // fade out before the meadow
         if (vy <= 0) continue;
@@ -326,8 +322,8 @@ function ReactiveGrid() {
           const d = mouse.has ? Math.hypot(x - mouse.x, y - mouse.y) : 9e9;
           const k = Math.max(0, 1 - d / R);
           const wob = Math.sin(t * 1.1 + x * 0.02 + y * 0.02) * 0.5 + 0.5;
-          const r = 1.1 + k * 3.4;
-          const al = (0.07 + k * 0.55 + wob * 0.025) * vy * scrollO;
+          const r = 1.5 + k * 4.0;
+          const al = (0.13 + k * 0.62 + wob * 0.035) * vy * scrollO;
           const dx = k ? ((x - mouse.x) / d) * k * 6 : 0;
           const dy = k ? ((y - mouse.y) / d) * k * 6 : 0;
           ctx.fillStyle = `rgba(${m[0]},${m[1]},${m[2]},${al})`;
@@ -431,7 +427,7 @@ function ScrollTaproot() {
         i={0}
         progress={scrollYProgress}
         place="center"
-        color="var(--ink)"
+        color="#000000"
       >
         <div style={{ textAlign: "center", transform: "translateY(-13vh)" }}>
           <HeroLine text={PANELS[0].text} />
@@ -586,32 +582,6 @@ function ScrollTaproot() {
         </div>
       </div>
 
-      {/* the gold question pill — one alive at a time, tethered to the growth tip */}
-      <button
-        ref={setEl("pill")}
-        onClick={onPill}
-        aria-label="continue to the answer"
-        style={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          zIndex: 5,
-          opacity: 0,
-          pointerEvents: "none",
-          background: "var(--gold)",
-          color: "#191412",
-          border: "none",
-          borderRadius: 999,
-          padding: "9px 16px",
-          fontFamily: "var(--font-sans)",
-          fontWeight: 700,
-          fontSize: 13,
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-          boxShadow: "0 6px 24px rgba(201,162,39,0.35)",
-          willChange: "transform, opacity",
-        }}
-      />
     </main>
   );
 }
