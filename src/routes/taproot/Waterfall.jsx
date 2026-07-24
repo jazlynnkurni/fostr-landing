@@ -12,7 +12,7 @@ const { Engine, Composite, Bodies, Body } = Matter;
 const RAMP = ["#2A6C6B", "#3D8584", "#5DA1A1", "#83BBBA", "#AFD7D5"];
 const CORE = "#DFF9F3";
 const CELL = 9;        // css px per ascii cell
-const MAX = 560;       // particle cap
+const MAX = 1100;      // particle cap (wide full-width sheet needs more water)
 
 export default function Waterfall() {
   const ref = useRef(null);
@@ -28,7 +28,7 @@ export default function Waterfall() {
     engine.gravity.y = 1.05;
     const world = engine.world;
 
-    let W = 0, H = 0;
+    let W = 0, H = 0, emitRate = 6;
     const parts = [];
     let walls = [];
 
@@ -44,12 +44,13 @@ export default function Waterfall() {
     function layout() {
       cx = W * 0.5;
       mouthY = H * 0.42;          // safely below the top-anchored headline
-      outletY = H * 0.66;
-      chuteEndY = H * 0.86;
-      mouthHalf = Math.min(W * 0.15, 220);
+      outletY = H * 0.70;
+      chuteEndY = H * 0.88;
+      mouthHalf = W * 0.46;       // spread nearly port-to-port, then converge to center
       outletHalf = Math.max(W * 0.02, 22);
-      emitY = mouthY - 28;
-      emitHalf = mouthHalf * 0.86;
+      emitY = mouthY - 24;
+      emitHalf = mouthHalf * 0.97; // rain across the whole width
+      emitRate = Math.max(6, Math.round(emitHalf / 26)); // more emitters across a wider sheet
     }
 
     function buildWalls() {
@@ -94,7 +95,7 @@ export default function Waterfall() {
     // pre-fill so the waterfall is already pouring on first paint
     function prime(steps) {
       for (let s = 0; s < steps; s++) {
-        spawn(5);
+        spawn(emitRate);
         Engine.update(engine, 1000 / 60);
         recycle();
       }
@@ -135,7 +136,7 @@ export default function Waterfall() {
     function loop() {
       if (running) {
         acc += 1;
-        if (acc % 1 === 0) spawn(5);
+        spawn(emitRate);
         Engine.update(engine, 1000 / 60);
         recycle();
         render();
@@ -144,7 +145,7 @@ export default function Waterfall() {
     }
 
     resize();
-    prime(90);
+    prime(130);
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     const io = new IntersectionObserver(([e]) => { running = e.isIntersecting; }, { threshold: 0 });
