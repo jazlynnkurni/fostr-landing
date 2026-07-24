@@ -117,14 +117,15 @@ function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0, clipTop = 
 function makePlantMaterial(hex) {
   return new THREE.ShaderMaterial({
     transparent: true,
+    side: THREE.DoubleSide, // hand-built triangles have mixed winding; draw both faces
     uniforms: {
       uColor: { value: new THREE.Color(hex) },
       uTime: { value: 0 },
-      uCell: { value: 6.0 },
-      uDot: { value: 0.42 },
-      uFill: { value: 0.86 }, // dither density: 1 = solid, lower = more stipple holes
-      uSwayAmp: { value: 0.13 },
-      uSwaySpeed: { value: 1.1 },
+      uCell: { value: 4.0 },  // finer grid so thin stems/spokes survive
+      uDot: { value: 0.62 },  // fatter dots -> solid silhouette, still pixelized
+      uFill: { value: 0.94 }, // dither density: 1 = solid, lower = more stipple holes
+      uSwayAmp: { value: 0.12 },
+      uSwaySpeed: { value: 1.05 },
     },
     vertexShader: `
       attribute float aWeight; attribute float aPhase;
@@ -153,62 +154,117 @@ function makePlantMaterial(hex) {
   });
 }
 
-// Little silhouette outlines (all rooted at y=0, growing up). Returns a THREE.Shape.
-function plantShape(kind) {
-  const s = new THREE.Shape();
-  if (kind === 0) {
-    // round "lollipop" tree: slim trunk flaring into a bushy canopy
-    s.moveTo(-0.05, 0);
-    s.lineTo(-0.05, 0.5);
-    s.bezierCurveTo(-0.5, 0.52, -0.44, 1.28, 0, 1.32);
-    s.bezierCurveTo(0.44, 1.28, 0.5, 0.52, 0.05, 0.5);
-    s.lineTo(0.05, 0);
-  } else if (kind === 1) {
-    // conifer: stacked triangular tiers on a short trunk
-    s.moveTo(-0.05, 0);
-    s.lineTo(-0.05, 0.22);
-    s.lineTo(-0.34, 0.22);
-    s.lineTo(-0.17, 0.58);
-    s.lineTo(-0.26, 0.58);
-    s.lineTo(-0.12, 0.94);
-    s.lineTo(0, 1.24);
-    s.lineTo(0.12, 0.94);
-    s.lineTo(0.26, 0.58);
-    s.lineTo(0.17, 0.58);
-    s.lineTo(0.34, 0.22);
-    s.lineTo(0.05, 0.22);
-    s.lineTo(0.05, 0);
-  } else if (kind === 2) {
-    // small shrub: a low rounded mound
-    s.moveTo(-0.3, 0);
-    s.bezierCurveTo(-0.36, 0.4, -0.2, 0.62, 0, 0.6);
-    s.bezierCurveTo(0.2, 0.62, 0.36, 0.4, 0.3, 0);
-  } else {
-    // grass tuft: three thin blades
-    s.moveTo(-0.16, 0);
-    s.lineTo(-0.02, 0.62);
-    s.lineTo(-0.08, 0.02);
-    s.lineTo(0.02, 0.66);
-    s.lineTo(0.03, 0.02);
-    s.lineTo(0.14, 0.5);
-    s.lineTo(0.16, 0);
+// ---- procedural wild-meadow silhouettes -------------------------------------
+// Plants are built from tiny filled triangles (stems as thin quads, flower heads
+// as blobs, seed-spikes/petals/leaflets as little segments) so they read like a
+// tangled wildflower meadow rather than clean geometric icons.
+function mulberry(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function triTo(o, ax, ay, bx, by, cx, cy) { o.push(ax, ay, 0, bx, by, 0, cx, cy, 0); }
+function segTo(o, ax, ay, bx, by, wa, wb) {
+  const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1e-4;
+  const nx = -dy / L * wa, ny = dx / L * wa, mx = -dy / L * wb, my = dx / L * wb;
+  o.push(ax + nx, ay + ny, 0, bx + mx, by + my, 0, ax - nx, ay - ny, 0);
+  o.push(ax - nx, ay - ny, 0, bx + mx, by + my, 0, bx - mx, by - my, 0);
+}
+function blobTo(o, cx, cy, r, n) {
+  n = n || 8;
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * 6.2832, a1 = ((i + 1) / n) * 6.2832;
+    triTo(o, cx, cy, cx + Math.cos(a0) * r, cy + Math.sin(a0) * r, cx + Math.cos(a1) * r, cy + Math.sin(a1) * r);
   }
-  return s;
+}
+function stemTo(o, pts, w0, w1) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const t0 = i / (pts.length - 1), t1 = (i + 1) / (pts.length - 1);
+    segTo(o, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], w0 + (w1 - w0) * t0, w0 + (w1 - w0) * t1);
+  }
+}
+function arcPts(arch, h, n) {
+  const p = [];
+  for (let i = 0; i <= n; i++) { const t = i / n; p.push([arch * t * t, h * t]); }
+  return p;
 }
 
-// Build a plant geometry from a shape, baking per-vertex sway weight (height fraction)
-// and a constant wind phase so many plants can share one material.
-function makePlantGeom(kind, phase) {
-  const g = new THREE.ShapeGeometry(plantShape(kind), 14);
-  const pos = g.attributes.position;
-  let maxY = 0.001;
-  for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
-  const weight = new Float32Array(pos.count);
-  const ph = new Float32Array(pos.count);
-  for (let i = 0; i < pos.count; i++) {
-    weight[i] = Math.min(1, pos.getY(i) / maxY);
-    ph[i] = phase;
+// Build one plant's triangle soup (rooted at y=0, growing up). kind picks the species.
+function buildPlant(kind, seed) {
+  const o = [];
+  const R = mulberry(seed);
+  const rnd = (a, b) => a + (b - a) * R();
+  if (kind === "umbel") {
+    // cow parsley / Queen Anne's lace: tall stem, radiating spokes, floret clusters
+    const h = rnd(1.3, 2.0), sway = rnd(-0.06, 0.06);
+    stemTo(o, [[0, 0], [sway * 0.3, h * 0.5], [sway, h]], 0.05, 0.022);
+    if (R() < 0.7) { const bh = h * rnd(0.45, 0.65); stemTo(o, [[sway * 0.3, bh], [sway + rnd(-0.18, 0.18), bh + rnd(0.18, 0.34)]], 0.03, 0.016); }
+    const spokes = Math.round(rnd(8, 12)), tx = sway, ty = h;
+    for (let i = 0; i < spokes; i++) {
+      const ang = Math.PI * 0.5 + (i / (spokes - 1) - 0.5) * Math.PI * 1.15;
+      const len = rnd(0.16, 0.3), ex = tx + Math.cos(ang) * len, ey = ty + Math.sin(ang) * len;
+      segTo(o, tx, ty, ex, ey, 0.02, 0.01);
+      blobTo(o, ex, ey, rnd(0.03, 0.055), 7);
+    }
+  } else if (kind === "spike") {
+    // grass seed-head (wheat): arching stem with alternating angled seeds up top
+    const h = rnd(1.1, 1.75), arch = rnd(0.06, 0.24) * (R() < 0.5 ? -1 : 1);
+    const pts = arcPts(arch, h, 6);
+    stemTo(o, pts, 0.032, 0.016);
+    const seeds = Math.round(rnd(10, 16));
+    for (let i = 0; i < seeds; i++) {
+      const t = 0.5 + 0.5 * (i / seeds), bx = arch * t * t, by = h * t, side = i % 2 ? 1 : -1, sl = rnd(0.06, 0.1);
+      segTo(o, bx, by, bx + side * sl, by + sl * 1.1, 0.03, 0.006);
+    }
+  } else if (kind === "daisy") {
+    // wildflower: stem with a petalled flower head
+    const h = rnd(0.7, 1.35), sway = rnd(-0.05, 0.05);
+    stemTo(o, [[0, 0], [sway * 0.5, h * 0.6], [sway, h]], 0.038, 0.02);
+    if (R() < 0.7) { const lh = h * rnd(0.3, 0.5), lx = sway * 0.4; segTo(o, lx, lh, lx + rnd(0.08, 0.16) * (R() < 0.5 ? -1 : 1), lh + 0.1, 0.05, 0.004); }
+    const cx = sway, cy = h, pet = Math.round(rnd(8, 12)), pr = rnd(0.1, 0.16);
+    for (let i = 0; i < pet; i++) { const a = (i / pet) * 6.2832; segTo(o, cx, cy, cx + Math.cos(a) * pr, cy + Math.sin(a) * pr, 0.04, 0.012); }
+    blobTo(o, cx, cy, pr * 0.45, 8);
+  } else if (kind === "fern") {
+    // feathery frond: arching stem with paired leaflets shrinking toward the tip
+    const h = rnd(0.9, 1.5), arch = rnd(0.12, 0.34) * (R() < 0.5 ? -1 : 1);
+    const pts = arcPts(arch, h, 8);
+    stemTo(o, pts, 0.03, 0.01);
+    const leaf = 12;
+    for (let i = 1; i < leaf; i++) {
+      const t = i / leaf, bx = arch * t * t, by = h * t, ln = (1 - t) * rnd(0.16, 0.24);
+      for (const s of [-1, 1]) segTo(o, bx, by, bx + s * ln, by + ln * 0.55, 0.03 * (1 - t) + 0.004, 0.002);
+    }
+  } else if (kind === "clover") {
+    // low bloom: short stem, small round head
+    const h = rnd(0.35, 0.7), sway = rnd(-0.04, 0.04);
+    stemTo(o, [[0, 0], [sway, h]], 0.03, 0.018);
+    blobTo(o, sway, h, rnd(0.06, 0.1), 9);
+  } else {
+    // grass blade tuft: several arching blades of varied height
+    const n = Math.round(rnd(6, 10));
+    for (let b = 0; b < n; b++) {
+      const bx = rnd(-0.2, 0.2), h = rnd(0.5, 1.1), sway = rnd(-0.22, 0.22);
+      stemTo(o, arcPts(sway, h, 5).map(([px, py]) => [bx + px, py]), 0.036, 0.003);
+    }
   }
+  return new Float32Array(o);
+}
+
+// Wrap the triangle soup in a BufferGeometry, baking per-vertex sway weight (height
+// fraction) and a constant wind phase so many plants can share one material.
+function makePlantGeom(kind, phase, seed) {
+  const positions = buildPlant(kind, seed);
+  const count = positions.length / 3;
+  let maxY = 0.001;
+  for (let i = 0; i < count; i++) maxY = Math.max(maxY, positions[i * 3 + 1]);
+  const weight = new Float32Array(count), ph = new Float32Array(count);
+  for (let i = 0; i < count; i++) { weight[i] = Math.min(1, positions[i * 3 + 1] / maxY); ph[i] = phase; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   g.setAttribute("aWeight", new THREE.BufferAttribute(weight, 1));
   g.setAttribute("aPhase", new THREE.BufferAttribute(ph, 1));
   return g;
@@ -331,17 +387,27 @@ function World({ progress, bridge }) {
 
   const soilGeom = useMemo(() => new THREE.PlaneGeometry(SOIL_W, SOIL_H), []);
 
-  // The miniature garden: little plants + trees scattered along the soil-block top,
-  // each with its own type, scale and wind phase.
+  // The miniature meadow: a dense, tangled row of wild plants along the soil top —
+  // tall wildflowers rising over a low understory of grass and small blooms.
   const garden = useMemo(() => {
     const topY = SOIL_Y + SOIL_H * 0.5 - 0.04; // rooted just into the block's top edge
-    const xs = [-5.0, -3.9, -3.0, -1.9, -1.0, 0.2, 1.3, 2.2, 3.2, 4.2, 5.1];
-    return xs.map((x, i) => {
-      const kind = [1, 3, 0, 2, 3, 0, 2, 1, 3, 0, 2][i % 11];
-      const phase = (i * 1.7) % 6.283;
-      const scale = 0.55 + ((i * 37) % 55) / 100; // 0.55..1.1, deterministic-ish
-      return { geom: makePlantGeom(kind, phase), x, y: topY, scale };
-    });
+    const R = mulberry(20240724);
+    const tall = ["umbel", "spike", "daisy", "fern", "spike", "umbel"];
+    const low = ["blades", "clover", "blades", "blades"];
+    const items = [];
+    let x = -5.6, i = 0;
+    while (x < 5.6) {
+      const isTall = R() < 0.5;
+      const kind = isTall ? tall[(R() * tall.length) | 0] : low[(R() * low.length) | 0];
+      const scale = isTall ? 0.7 + R() * 0.5 : 0.5 + R() * 0.45;
+      items.push({
+        geom: makePlantGeom(kind, (i * 1.3) % 6.283, (Math.imul(i + 1, 2654435761) >>> 0)),
+        x, y: topY, scale, z: 0.02 + R() * 0.1,
+      });
+      x += 0.26 + R() * 0.34;
+      i++;
+    }
+    return items;
   }, []);
   useEffect(() => () => garden.forEach((p) => p.geom.dispose()), [garden]);
 
@@ -628,7 +694,7 @@ function World({ progress, bridge }) {
 
       {/* a miniature garden of dithered pixel plants swaying on top of the soil */}
       {garden.map((p, i) => (
-        <mesh key={`plant${i}`} geometry={p.geom} material={mats.plant} position={[p.x, p.y, 0.05]} scale={p.scale} />
+        <mesh key={`plant${i}`} geometry={p.geom} material={mats.plant} position={[p.x, p.y, p.z]} scale={p.scale} />
       ))}
 
       {/* the taproot — the only saturated, emissive thing underground.
