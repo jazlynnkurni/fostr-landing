@@ -212,7 +212,7 @@ function ScrollTaproot() {
         place="center"
         color="var(--ink)"
       >
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", transform: "translateY(-13vh)" }}>
           <H size="clamp(2.4rem, 6vw, 4.6rem)" style={{ maxWidth: "18ch" }}>
             {PANELS[0].text}
           </H>
