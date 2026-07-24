@@ -165,6 +165,24 @@ function makePlantMaterial(hex) {
   });
 }
 
+// Full-background vertical gradient: pure white up top, easing smoothly into a soft
+// turquoise with depth — one continuous ramp, no horizon edge or banding.
+function makeBgMaterial() {
+  return new THREE.ShaderMaterial({
+    depthWrite: false,
+    vertexShader: `
+      varying float vWY;
+      void main(){ vWY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      varying float vWY;
+      void main(){
+        float k = clamp((2.0 - vWY) / 27.0, 0.0, 1.0);   // 0 at the surface, 1 deep
+        vec3 col = mix(vec3(1.0), vec3(0.549, 0.792, 0.784), pow(k, 1.2)); // white -> soft turquoise
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+}
+
 // The ground: ONE continuous dotted field. It's fully dense for a solid surface band
 // just under the horizon, then smoothly dither-dissolves with depth until it's gone —
 // so there's no hard "block then sparse" seam, just soil fading into the earth.
@@ -473,15 +491,14 @@ function World({ progress, bridge }) {
       // root only renders below the soil block: clipTop is set so the 0.5-unit fade
       // band lands INSIDE the block, and the root is already full density at the block's
       // underside — no sparse gap, no white space between soil and root.
-      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0, SOIL_Y - SOIL_H * 0.5 + 0.6),
-      branch: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
-      lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12, 0.0),
-      shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
-      // the soil block: a dense, near-static dotted band, same teal family as the root
+      root: makeDotMaterial("#6FCECC", 0.36, 0.06, 1.0, SOIL_Y - SOIL_H * 0.5 + 0.6),
+      branch: makeDotMaterial("#6FCECC", 0.34, 0.06, 0.0),
+      lateral: makeDotMaterial("#2A7A78", 0.26, 0.12, 0.0),
+      shoot: makeDotMaterial("#E1C78E", 0.34, 0.06, 0.0),
       // the whole ground: solid surface band dissolving down into the earth
-      seep: makeSeepMaterial("#2E6E6D", SEEP_TOP, SEEP_H),
+      seep: makeSeepMaterial("#6FCECC", SEEP_TOP, SEEP_H),
       // dithered, wind-swayed pixel plants on top of the soil
-      plant: makePlantMaterial("#2E6E6D"),
+      plant: makePlantMaterial("#E1C78E"),
     }),
     []
   );
@@ -546,21 +563,15 @@ function World({ progress, bridge }) {
   }, [seed]);
 
   // Soil: one big vertex-colored gradient wall behind the root.
+  // Big background quad, extends well past the frame so the shader gradient fills the
+  // whole view with no visible edge at any camera depth.
   const planeGeom = useMemo(() => {
-    const g = new THREE.PlaneGeometry(90, 34, 1, 40);
-    g.translate(0, -17, 0); // top edge at the horizon (y=0)
-    const pos = g.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    const c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      rampColor(pos.getY(i) + 0.6, c);
-      colors[i * 3] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
-    }
-    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    const g = new THREE.PlaneGeometry(120, 70);
+    g.translate(0, -12, 0); // spans y=+23 .. -47
     return g;
   }, []);
+  const bgMat = useMemo(() => makeBgMaterial(), []);
+  useEffect(() => () => bgMat.dispose(), [bgMat]);
 
   // Small node spheres that pop in as the growth tip passes them.
   const nodes = useMemo(() => {
@@ -743,10 +754,8 @@ function World({ progress, bridge }) {
 
   return (
     <>
-      {/* soil gradient wall */}
-      <mesh geometry={planeGeom} position={[0, 0, -4]}>
-        <meshBasicMaterial vertexColors />
-      </mesh>
+      {/* full-view background gradient: white -> soft turquoise, no horizon edge */}
+      <mesh geometry={planeGeom} material={bgMat} position={[0, 0, -6]} />
 
       {/* the ground: dense surface band that dissolves down into the earth (one field) */}
       <mesh geometry={seepGeom} material={mats.seep} position={[0, SEEP_TOP - SEEP_H * 0.5, -0.05]} />
