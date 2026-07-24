@@ -423,6 +423,55 @@ function ColorTuner({ bridge }) {
   );
 }
 
+// Site-wide cursor mosaic: a pixelated turquoise trail that lights the grid cells the
+// cursor passes and fades them out — the old thermal-pixel cursor, back.
+function CursorMosaic() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const hex = (getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1").match(/[0-9a-f]{2}/gi) || ["5d", "a1", "a1"];
+    const m = hex.map((h) => parseInt(h, 16));
+    const CELL = 15;
+    const cells = new Map();
+    let mx = -1e4, my = -1e4, has = false, raf = 0;
+    const move = (e) => { mx = e.clientX; my = e.clientY; has = true; };
+    const resize = () => { canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr; canvas.style.width = window.innerWidth + "px"; canvas.style.height = window.innerHeight + "px"; };
+    resize();
+    window.addEventListener("resize", resize);
+    window.addEventListener("pointermove", move, { passive: true });
+    let seed = 1;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    function loop() {
+      raf = requestAnimationFrame(loop);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      if (has) {
+        const gx = Math.floor(mx / CELL), gy = Math.floor(my / CELL);
+        for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+          const d = Math.hypot(dx, dy);
+          if (d > 2.4) continue;
+          const key = (gx + dx) + "," + (gy + dy);
+          const c = cells.get(key) || { x: gx + dx, y: gy + dy, v: 0 };
+          c.v = Math.min(1, c.v + (1 - d / 2.6) * (0.4 + rnd() * 0.6) * 0.6);
+          cells.set(key, c);
+        }
+      }
+      cells.forEach((c, key) => {
+        c.v *= 0.9;
+        if (c.v < 0.03) { cells.delete(key); return; }
+        ctx.fillStyle = `rgba(${m[0]},${m[1]},${m[2]},${(c.v * 0.68).toFixed(3)})`;
+        ctx.fillRect(c.x * CELL, c.y * CELL, CELL - 1, CELL - 1);
+      });
+    }
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); window.removeEventListener("pointermove", move); };
+  }, []);
+  return <canvas ref={ref} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 8, pointerEvents: "none", mixBlendMode: "multiply" }} />;
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -482,6 +531,7 @@ function ScrollTaproot() {
 
       {/* interactive pixel grid in the hero's white space */}
       <ReactiveGrid />
+      <CursorMosaic />
       <ColorTuner bridge={bridge} />
 
       {/* warm ground for germination */}
