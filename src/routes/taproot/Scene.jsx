@@ -125,8 +125,8 @@ function makePlantMaterial(hex) {
       uTime: { value: 0 },
       uCell: { value: 6.0 },   // match the soil's dot grid exactly
       uDot: { value: 0.46 },   // match the soil's dot size
-      uSwayAmp: { value: 0.12 },
-      uSwaySpeed: { value: 1.05 },
+      uSwayAmp: { value: 0.17 },
+      uSwaySpeed: { value: 1.28 },
     },
     vertexShader: `
       attribute float aWeight; attribute float aPhase;
