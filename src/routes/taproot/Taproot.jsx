@@ -349,7 +349,7 @@ function ColorTuner({ bridge }) {
   const [, force] = useState(0);
   useEffect(() => { const id = setInterval(() => force((x) => x + 1), 400); return () => clearInterval(id); }, []);
   if (typeof window === "undefined" || !/(\?|&)tune/.test(window.location.search)) return null;
-  const fields = [["soil", "Soil block"], ["root", "Main root"], ["branch", "Branches"], ["lateral", "Laterals"], ["shoot", "Shoot"], ["plant", "Meadow"]];
+  const fields = [["seep", "Ground/soil"], ["root", "Main root"], ["branch", "Branches"], ["lateral", "Laterals"], ["shoot", "Shoot"], ["plant", "Meadow"]];
   const mats = bridge.current.mats;
   const get = (k) => (mats?.[k] ? "#" + mats[k].uniforms.uColor.value.getHexString() : "#2e6e6d");
   const set = (k, v) => { if (mats?.[k]) { mats[k].uniforms.uColor.value.set(v); force((x) => x + 1); } };

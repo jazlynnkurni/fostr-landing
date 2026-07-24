@@ -165,16 +165,16 @@ function makePlantMaterial(hex) {
   });
 }
 
-// Pixels seeping down out of the soil: a screen-space dot grid whose density fades
-// with depth (dense at uTop -> gone by uTop - uSpan), with a slow downward-drifting
-// density wave so the soil looks like it's bleeding pixels into the earth.
+// The ground: ONE continuous dotted field. It's fully dense for a solid surface band
+// just under the horizon, then smoothly dither-dissolves with depth until it's gone —
+// so there's no hard "block then sparse" seam, just soil fading into the earth.
 function makeSeepMaterial(hex, top, span) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uColor: { value: new THREE.Color(hex) },
       uTime: { value: 0 },
       uCell: { value: 6.0 },
-      uDot: { value: 0.44 },
+      uDot: { value: 0.46 },
       uTop: { value: top },
       uSpan: { value: span },
     },
@@ -189,12 +189,13 @@ function makeSeepMaterial(hex, top, span) {
         vec2 cell = floor(gl_FragCoord.xy / uCell);
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
         if (length(f) > uDot) discard;
-        float depth = clamp((uTop - vWY) / uSpan, 0.0, 1.0);   // 0 at surface -> 1 deep
-        float keep = pow(1.0 - depth, 1.6);                    // sparser with depth
-        keep *= 0.72 + 0.28 * sin((vWY * 2.4 - uTime * 1.8));  // downward-drifting waves
+        float d = uTop - vWY;                              // depth below the surface top
+        if (d < -0.05) discard;                            // nothing above ground
+        // solid for the top band, then one smooth continuous dissolve to nothing
+        float keep = 1.0 - smoothstep(0.85, uSpan, d);
         if (hash(cell * 0.7) > keep) discard;
         float jit = hash(cell);
-        float t = 0.4 + 0.34 * jit + 0.08 * sin(uTime * 1.4 + jit * 6.283);
+        float t = 0.4 + 0.34 * jit + 0.06 * sin(uTime * 1.2 + jit * 6.283); // gentle sparkle only
         vec3 col = mix(uColor * 0.45, uColor, t);
         gl_FragColor = vec4(col, 1.0);
       }`,
@@ -432,8 +433,6 @@ function World({ progress, bridge }) {
     [mainCurve]
   );
 
-  const soilGeom = useMemo(() => new THREE.PlaneGeometry(SOIL_W, SOIL_H), []);
-
   // The miniature meadow: a dense, tangled row of wild plants along the soil top —
   // tall wildflowers rising over a low understory of grass and small blooms.
   const garden = useMemo(() => {
@@ -462,7 +461,10 @@ function World({ progress, bridge }) {
   // at the underside and dithers out with depth (with a gentle downward-drifting
   // density wave), so the soil dissolves naturally into the earth and leaves room for
   // the next-section transition. Not roots — just soil bleeding through.
-  const SEEP_H = 2.3; // just long enough to bridge white -> turquoise; must clear the cards
+  // One ground field: dense surface band at the top, dissolving down. Spans from the
+  // surface (soil-top) down far enough to fade before the panel-2 cards.
+  const SEEP_TOP = SOIL_Y + SOIL_H * 0.5;
+  const SEEP_H = 3.3;
   const seepGeom = useMemo(() => new THREE.PlaneGeometry(SOIL_W, SEEP_H), []);
 
   // Dotted flicker materials (deep teal on the pale turquoise world).
@@ -476,9 +478,8 @@ function World({ progress, bridge }) {
       lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12, 0.0),
       shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       // the soil block: a dense, near-static dotted band, same teal family as the root
-      soil: makeDotMaterial("#2E6E6D", 0.46, 0.015, 0.0),
-      // pixels seeping down out of the soil, dithering out with depth
-      seep: makeSeepMaterial("#2E6E6D", SOIL_Y - SOIL_H * 0.5, SEEP_H),
+      // the whole ground: solid surface band dissolving down into the earth
+      seep: makeSeepMaterial("#2E6E6D", SEEP_TOP, SEEP_H),
       // dithered, wind-swayed pixel plants on top of the soil
       plant: makePlantMaterial("#2E6E6D"),
     }),
@@ -590,7 +591,6 @@ function World({ progress, bridge }) {
     mats.branch.uniforms.uTime.value = tNow;
     mats.lateral.uniforms.uTime.value = tNow;
     mats.shoot.uniforms.uTime.value = tNow;
-    mats.soil.uniforms.uTime.value = tNow;
     mats.seep.uniforms.uTime.value = tNow;
     mats.plant.uniforms.uTime.value = tNow;
     const b = bridge.current;
@@ -748,16 +748,13 @@ function World({ progress, bridge }) {
         <meshBasicMaterial vertexColors />
       </mesh>
 
-      {/* the hero soil block — a full-width dotted band the root hangs from */}
-      <mesh geometry={soilGeom} material={mats.soil} position={[0, SOIL_Y, 0]} />
+      {/* the ground: dense surface band that dissolves down into the earth (one field) */}
+      <mesh geometry={seepGeom} material={mats.seep} position={[0, SEEP_TOP - SEEP_H * 0.5, -0.05]} />
 
       {/* a miniature garden of dithered pixel plants swaying on top of the soil */}
       {garden.map((p, i) => (
         <mesh key={`plant${i}`} geometry={p.geom} material={mats.plant} position={[p.x, p.y, p.z]} scale={p.scale} />
       ))}
-
-      {/* pixels seeping down out of the soil, dithering out with depth */}
-      <mesh geometry={seepGeom} material={mats.seep} position={[0, SOIL_Y - SOIL_H * 0.5 - SEEP_H * 0.5, -0.05]} />
 
       {/* the taproot — the only saturated, emissive thing underground.
           No spheres anywhere: the root is JUST the dotted tube (jaz will add
