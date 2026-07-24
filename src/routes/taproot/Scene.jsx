@@ -230,8 +230,10 @@ function World({ progress, bridge }) {
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
-      // root only renders below the soil block (clipTop), emerging from its underside
-      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0, SOIL_Y - SOIL_H * 0.5 + 0.08),
+      // root only renders below the soil block: clipTop is set so the 0.5-unit dither
+      // band lands INSIDE the block, and the root is already full density at the block's
+      // underside — no sparse gap, no white space between soil and root.
+      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0, SOIL_Y - SOIL_H * 0.5 + 0.6),
       branch: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12, 0.0),
       shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
@@ -324,7 +326,9 @@ function World({ progress, bridge }) {
       [fractionAtY(lut, latNode.y + 0.02), 0.13],
       [0.85, 0.08],
     ];
-    return list.map(([f, r]) => ({ f, r, pos: mainCurve.getPointAt(f) }));
+    // Drop any node that would sit in/above the soil block — it reads as a stray ball
+    // floating in the soil->root handoff.
+    return list.map(([f, r]) => ({ f, r, pos: mainCurve.getPointAt(f) })).filter((n) => n.pos.y < SOIL_Y - SOIL_H);
   }, [lut, mainCurve, node, latNode]);
 
   useEffect(() => {
