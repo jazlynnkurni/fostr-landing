@@ -89,7 +89,7 @@ function Panel({ i, progress, place = "center", color = "var(--ink)", backdrop, 
 }
 
 const H = ({ children, size = "clamp(2rem, 5.2vw, 3.9rem)", style }) => (
-  <h2 style={{ fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.02em", margin: "0 auto", ...style }}>{children}</h2>
+  <h2 style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.02em", margin: "0 auto", ...style }}>{children}</h2>
 );
 
 // Hero headline, kinetic. "Most of a caseworker's day" settles first; a beat later
@@ -246,59 +246,55 @@ function HeroLine({ text }) {
   );
 }
 
-// The markets the same spine serves — icon capsules that stagger in on scroll.
-function MarketPills() {
-  const items = [
-    { label: "Child welfare", paths: (
-      <>
-        <circle cx="8" cy="6" r="2.3" />
-        <path d="M8 8.4 V15 M8 15 l-2 4.6 M8 15 l2 4.6" />
-        <circle cx="16" cy="10" r="1.7" />
-        <path d="M16 11.6 V16 M16 16 l-1.4 3.5 M16 16 l1.4 3.5" />
-        <path d="M9.7 12.6 H14.3" />
-      </>
-    ) },
-    { label: "Group homes", paths: (
-      <>
-        <path d="M3 11 L12 4.5 L21 11" />
-        <path d="M5.5 10 V20 H18.5 V10" />
-        <path d="M10 20 V15.5 H14 V20" />
-        <path d="M7.5 13 h2 M14.5 13 h2" />
-      </>
-    ) },
-    { label: "Elder care", paths: (
-      <>
-        <circle cx="10" cy="5" r="2.2" />
-        <path d="M10 7.2 V13 M10 13 l-2 6.5 M10 13 l1.6 6.5" />
-        <path d="M10 9.2 l4 2.2" />
-        <path d="M14 11.4 V20" />
-      </>
-    ) },
-  ];
-  const wrap = { hidden: {}, show: { transition: { staggerChildren: 0.13, delayChildren: 0.08 } } };
-  const item = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } };
+// Inline icons that sit right beside their phrase in the copy, so the meaning lands
+// instantly: a smile for child welfare, a house for group homes, an elder for elder care.
+const PHRASE_ICONS = {
+  "child welfare": (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M8.4 13.6 Q12 16.8 15.6 13.6" />
+      <circle cx="9.4" cy="10" r="0.7" fill="var(--teal)" stroke="none" />
+      <circle cx="14.6" cy="10" r="0.7" fill="var(--teal)" stroke="none" />
+    </>
+  ),
+  "group homes": (
+    <>
+      <path d="M4 11 L12 5 L20 11" />
+      <path d="M6 10 V19 H18 V10" />
+      <path d="M10 19 V14.5 H14 V19" />
+    </>
+  ),
+  "elder care": (
+    <>
+      <circle cx="10" cy="5.5" r="2.2" />
+      <path d="M10 7.7 V13.5 M10 13.5 l-2 6 M10 13.5 l1.6 6" />
+      <path d="M10 9.6 l3.8 2" />
+      <path d="M13.8 11.6 V20" />
+    </>
+  ),
+};
+
+function PhraseIcon({ paths }) {
   return (
-    <motion.div
-      variants={wrap}
-      initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, amount: 0.6 }}
-      style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 36 }}
-    >
-      {items.map((m) => (
-        <motion.div
-          key={m.label}
-          variants={item}
-          style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "rgba(93,161,161,0.12)", border: "1px solid rgba(93,161,161,0.4)", color: "var(--ink)", borderRadius: 999, padding: "9px 17px 9px 13px", fontFamily: "var(--font-inter)", fontSize: "clamp(13px, 1.3vw, 15px)", fontWeight: 500 }}
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" style={{ flex: "0 0 auto" }} fill="none" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            {m.paths}
-          </svg>
-          {m.label}
-        </motion.div>
-      ))}
-    </motion.div>
+    <svg viewBox="0 0 24 24" width="0.95em" height="0.95em" aria-hidden style={{ display: "inline-block", verticalAlign: "-0.08em", margin: "0 0.06em 0 0.3em" }} fill="none" stroke="var(--teal)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {paths}
+    </svg>
   );
+}
+
+// Render verbatim copy with an icon dropped in right after each keyed phrase.
+function CopyWithIcons({ text }) {
+  const parts = text.split(/(child welfare|group homes|elder care)/i);
+  return parts.map((part, i) => {
+    const icon = PHRASE_ICONS[part.toLowerCase()];
+    if (!icon) return <span key={i}>{part}</span>;
+    return (
+      <span key={i} style={{ whiteSpace: "nowrap" }}>
+        {part}
+        <PhraseIcon paths={icon} />
+      </span>
+    );
+  });
 }
 
 // Form sheets fossilized in the soil wall (panel 2): the same fields on every one.
@@ -549,8 +545,7 @@ function ScrollTaproot() {
       {/* 6 — lateral galleries: the same spine serves other markets (icon pills) */}
       <Panel i={5} progress={scrollYProgress}>
         <div style={{ textAlign: "center" }}>
-          <H style={{ maxWidth: "30ch" }}>{PANELS[5].text}</H>
-          <MarketPills />
+          <H style={{ maxWidth: "30ch" }}><CopyWithIcons text={PANELS[5].text} /></H>
           <div style={{ marginTop: 40 }}>
             <div aria-hidden style={{ width: 1, height: 34, background: "rgba(30,38,36,0.3)", margin: "0 auto 14px" }} />
             <div style={{ ...mono, fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(30,38,36,0.65)" }}>
