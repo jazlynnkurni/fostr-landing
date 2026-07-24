@@ -95,34 +95,40 @@ const H = ({ children, size = "clamp(2rem, 5.2vw, 3.9rem)", style }) => (
 // "never reaches a kid." sinks in heavy from above — landing a hair low and a touch
 // under full weight, so the line arrives *not quite whole*, echoing the words. Plays
 // once on load; the reduced-motion path (StaticTaproot) renders it plainly instead.
-// The "Reach": once the line has landed, the word "reaches" slowly stretches
-// rightward toward "a kid" — straining across the gap, closing it to a hair but
-// never quite touching, then relaxing and reaching again. The typography enacts
-// the sentence: it is forever reaching, and it never gets there.
-function ReachWord({ children }) {
+// The "Reach" (rubber-band): once the line has landed, "never reaches" and "a kid"
+// — both undistorted — get pulled apart, the space between them stretching like a
+// tensioned rubber band, then snap back together and overshoot into a damped
+// bounce before settling. The gap itself enacts the sentence: strained toward each
+// other, never at rest. Loops slowly.
+function ElasticReach({ left, right }) {
+  // keyframes: rest -> pulled apart -> snap past centre (compress) -> rebound -> settle
+  const times = [0, 0.4, 0.62, 0.78, 0.9];
+  const t = {
+    duration: 3.0,
+    times,
+    ease: ["easeOut", "easeIn", "easeOut", "easeInOut"],
+    repeat: Infinity,
+    repeatDelay: 0.5,
+    delay: 2.0,
+  };
   return (
-    <motion.span
-      style={{ display: "inline-block", transformOrigin: "0% 50%", whiteSpace: "nowrap" }}
-      initial={{ scaleX: 1 }}
-      animate={{ scaleX: [1, 1.06, 1.06, 1] }}
-      transition={{ duration: 3.4, times: [0, 0.42, 0.6, 1], ease: [0.33, 0, 0.2, 1], repeat: Infinity, repeatDelay: 0.7, delay: 2.0 }}
-    >
-      {children}
-    </motion.span>
+    <span style={{ whiteSpace: "nowrap" }}>
+      <motion.span style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, -12, 3, -1.4, 0] }} transition={t}>
+        {left}
+      </motion.span>
+      {" "}
+      <motion.span style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, 12, -3, 1.4, 0] }} transition={t}>
+        {right}
+      </motion.span>
+    </span>
   );
 }
 
-// Wrap one word in the Reach animation, leaving the rest of the line static.
-function reachWord(text, word) {
-  const idx = text.indexOf(word);
-  if (idx < 0) return text;
-  return (
-    <>
-      {text.slice(0, idx)}
-      <ReachWord>{word}</ReachWord>
-      {text.slice(idx + word.length)}
-    </>
-  );
+// Split "never reaches a kid." into the two chunks the rubber band pulls apart.
+function reachLine(text) {
+  const cut = text.indexOf("reaches") + "reaches".length;
+  if (cut < "reaches".length) return text;
+  return <ElasticReach left={text.slice(0, cut)} right={text.slice(cut).trimStart()} />;
 }
 
 function HeroLine({ text }) {
@@ -153,7 +159,7 @@ function HeroLine({ text }) {
           animate={{ opacity: 0.9, y: 3 }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.34, 1], delay: 0.95 }}
         >
-          {reachWord(p2, "reaches")}
+          {reachLine(p2)}
         </motion.span>
       )}
     </h2>
