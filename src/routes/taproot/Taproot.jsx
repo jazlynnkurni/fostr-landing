@@ -11,6 +11,7 @@ import { SECTION_VHS, PB } from "./journey.js";
 import StaticTaproot from "./StaticTaproot.jsx";
 
 const Scene = lazy(() => import("./Scene.jsx"));
+const Waterfall = lazy(() => import("./Waterfall.jsx"));
 
 const mono = { fontFamily: "var(--font-inter)", fontWeight: 600 };
 
@@ -209,7 +210,13 @@ function ScrollTaproot() {
       <Panel
         i={0}
         progress={scrollYProgress}
+        place="top"
         color="var(--ink)"
+        backdrop={
+          <Suspense fallback={null}>
+            <Waterfall />
+          </Suspense>
+        }
       >
         <div style={{ textAlign: "center" }}>
           <H size="clamp(2.4rem, 6vw, 4.6rem)" style={{ maxWidth: "18ch" }}>

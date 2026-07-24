@@ -44,7 +44,7 @@ function rampColor(y, out) {
 // Gaps use discard (no blending), which keeps edges crisp at any DPR.
 // Dotted "ascii" material: the root renders as a screen-space grid of dots with a
 // gentle shade shimmer. Gaps are static (no blinking); discard keeps edges crisp.
-function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0) {
+function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0, clipTop = 100.0) {
   // Flowing-river ascii material. Dots live in a screen-space grid (crisp at any DPR),
   // but bright "water packets" travel DOWN the tube length over time (via the uv.x
   // length varying), so the root never sits still. `uHead` turns the very top into a
@@ -58,39 +58,46 @@ function makeDotMaterial(hex, dot = 0.34, dropout = 0.06, head = 0.0) {
       uDot: { value: dot },
       uDrop: { value: dropout },
       uHead: { value: head },
+      uClipTop: { value: clipTop },
     },
     vertexShader: `
-      varying float vLen; varying float vRound;
+      varying float vLen; varying float vRound; varying float vWY;
       void main(){
-        vLen = uv.x; vRound = uv.y;
+        vLen = uv.x; vRound = uv.y; vWY = position.y;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
     fragmentShader: `
-      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop; uniform float uHead;
-      varying float vLen; varying float vRound;
+      uniform vec3 uColor; uniform float uTime; uniform float uCell; uniform float uDot; uniform float uDrop; uniform float uHead; uniform float uClipTop;
+      varying float vLen; varying float vRound; varying float vWY;
+      const float TAU = 6.28318530718;
       float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
       void main(){
         vec2 cell = floor(gl_FragCoord.xy / uCell);
         vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
         if (length(f) > uDot) discard;
 
-        float head = uHead * smoothstep(0.16, 0.0, vLen);        // waterfall mouth region
-        float drop = uDrop + head * 0.30;                        // spray gaps at the head
+        // Above the horizon the physics waterfall owns the frame: the 3D root only
+        // renders underground, dithering out through a soft band at the surface.
+        float fade = smoothstep(uClipTop, uClipTop - 1.6, vWY);
+        if (fade < 0.02 || hash(cell * 1.7 + 4.0) > fade) discard;
+
+        float head = uHead * smoothstep(0.30, 0.16, vLen);       // faster flow up high
+        float drop = uDrop + head * 0.10;                        // keep the crest dense/visible
         if (hash(cell * 0.61) < drop) discard;
 
-        float jit = hash(cell) * 0.22;
-        float spd = 0.85 + head * 1.7;                           // faster water at the head
-        float flow = fract(vLen * 20.0 - uTime * spd + jit);     // packets travel down
-        float fine = fract(vLen * 46.0 - uTime * spd * 1.7 - jit);
-        float packet = smoothstep(0.0, 0.10, flow) * (1.0 - smoothstep(0.10, 0.85, flow));
-        float ripple = smoothstep(0.0, 0.16, fine) * (1.0 - smoothstep(0.16, 1.0, fine));
+        float jit = hash(cell);
+        float spd = 1.2 + head * 2.0;                            // faster water at the head
+        // two downward-travelling wave trains: every cell is ALWAYS moving
+        float w1 = 0.5 + 0.5 * sin((vLen * 26.0 - uTime * spd + jit) * TAU);
+        float w2 = 0.5 + 0.5 * sin((vLen * 11.0 - uTime * (spd * 0.55) + jit * 0.7) * TAU);
+        float flow = w1 * 0.62 + w2 * 0.38;
 
-        float round3d = 1.0 - pow(abs(vRound - 0.5) * 2.0, 1.5); // bright center, dark rim
+        float round3d = 1.0 - pow(abs(vRound - 0.5) * 2.0, 1.5); // bright center, dark rim = 3D
 
-        float t = clamp(0.24 + packet * 0.6 + ripple * 0.18 + round3d * 0.18
-                        + head * 0.22 * hash(cell + floor(uTime * 10.0)), 0.0, 1.0);
-        vec3 dark = uColor * 0.42;
-        vec3 light = mix(uColor, vec3(0.90, 0.99, 0.96), 0.7);
+        float t = clamp(0.12 + flow * 0.72 + round3d * 0.16
+                        + head * 0.16 * hash(cell + floor(uTime * 12.0)), 0.0, 1.0);
+        vec3 dark = uColor * 0.4;
+        vec3 light = mix(uColor, vec3(0.90, 0.99, 0.96), 0.72);
         vec3 col = t < 0.5 ? mix(dark, uColor, t * 2.0) : mix(uColor, light, (t - 0.5) * 2.0);
         gl_FragColor = vec4(col, 1.0);
       }`,
@@ -107,7 +114,7 @@ function taperTube(curve, tubularSegments, radialSegments, radiusFn) {
     const u = i / tubularSegments;
     curve.getPointAt(u, P);
     const N = frames.normals[i], B = frames.binormals[i];
-    const r = radiusFn(u);
+    const r = radiusFn(u, P.y);
     for (let j = 0; j <= radialSegments; j++) {
       const ang = (j / radialSegments) * Math.PI * 2;
       const cos = -Math.cos(ang), sin = Math.sin(ang);
@@ -135,33 +142,10 @@ function taperTube(curve, tubularSegments, radialSegments, radiusFn) {
   return g;
 }
 
-// Stationary ascii band: a full-width field of dots at the surface (does NOT flow, unlike
-// the river). Static per-cell brightness + static gaps; the band's top/bottom edges
-// dissolve (rising dropout via the plane's uv.y) so it reads as ground, not a hard bar.
-function makeGroundMaterial(hex) {
-  return new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color(hex) }, uCell: { value: 6.0 }, uDot: { value: 0.34 }, uDrop: { value: 0.12 } },
-    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `
-      uniform vec3 uColor; uniform float uCell; uniform float uDot; uniform float uDrop;
-      varying vec2 vUv;
-      float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-      void main(){
-        vec2 cell = floor(gl_FragCoord.xy / uCell);
-        vec2 f = fract(gl_FragCoord.xy / uCell) - 0.5;
-        if (length(f) > uDot) discard;
-        float band = smoothstep(0.0, 0.42, vUv.y) * smoothstep(1.0, 0.58, vUv.y); // fade edges
-        float drop = mix(0.97, uDrop, band);
-        if (hash(cell * 0.61) < drop) discard;
-        float b = 0.82 + 0.18 * hash(cell);                    // static per-cell shade, no motion
-        gl_FragColor = vec4(mix(vec3(1.0), uColor, b), 1.0);
-      }`,
-  });
-}
 
 // The taproot: one slightly wandering curve from just above the horizon to the seed.
 const MAIN_PTS = [
-  [0.0, 3.4, 0.0],   // the road begins at the very top, dead straight
+  [0.0, 8.0, 0.0],   // source is above the frame: only the converging funnel shows
   [0.0, 1.2, 0.0],
   [0.0, -1.0, 0.0],
   [-0.25, -2.8, 0.15], // only now does it start to wander
@@ -231,19 +215,14 @@ function World({ progress, bridge }) {
 
   const rootGeom = useMemo(
     () =>
-      taperTube(mainCurve, 360, 8, (u) => {
-        const tt = Math.min(1, Math.max(0, (u - 0.17) / (0.0 - 0.17)));
-        const wide = tt * tt * (3 - 2 * tt); // 1 at the very top, 0 by u=0.17
-        return 0.125 * (1 + 1.9 * wide);     // river 0.125 -> waterfall mouth ~0.36
-      }),
+      taperTube(mainCurve, 360, 8, () => 0.1), // constant river; the physics waterfall is the hero
     [mainCurve]
   );
 
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
-      ground: makeGroundMaterial("#357B7A"),
-      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0),
+      root: makeDotMaterial("#2E6E6D", 0.36, 0.06, 1.0, 0.4), // clip above the surface; waterfall owns the sky
       branch: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       lateral: makeDotMaterial("#6FA5A4", 0.26, 0.12, 0.0),
       shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
@@ -505,10 +484,6 @@ function World({ progress, bridge }) {
       {/* soil gradient wall */}
       <mesh geometry={planeGeom} position={[0, 0, -4]}>
         <meshBasicMaterial vertexColors />
-      </mesh>
-      {/* stationary ascii ground band across the surface, full viewport width */}
-      <mesh position={[0, 0, -3.9]} material={mats.ground}>
-        <planeGeometry args={[120, 2.6]} />
       </mesh>
 
       {/* the taproot — the only saturated, emissive thing underground */}
