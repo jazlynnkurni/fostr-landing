@@ -246,6 +246,61 @@ function HeroLine({ text }) {
   );
 }
 
+// The markets the same spine serves — icon capsules that stagger in on scroll.
+function MarketPills() {
+  const items = [
+    { label: "Child welfare", paths: (
+      <>
+        <circle cx="8" cy="6" r="2.3" />
+        <path d="M8 8.4 V15 M8 15 l-2 4.6 M8 15 l2 4.6" />
+        <circle cx="16" cy="10" r="1.7" />
+        <path d="M16 11.6 V16 M16 16 l-1.4 3.5 M16 16 l1.4 3.5" />
+        <path d="M9.7 12.6 H14.3" />
+      </>
+    ) },
+    { label: "Group homes", paths: (
+      <>
+        <path d="M3 11 L12 4.5 L21 11" />
+        <path d="M5.5 10 V20 H18.5 V10" />
+        <path d="M10 20 V15.5 H14 V20" />
+        <path d="M7.5 13 h2 M14.5 13 h2" />
+      </>
+    ) },
+    { label: "Elder care", paths: (
+      <>
+        <circle cx="10" cy="5" r="2.2" />
+        <path d="M10 7.2 V13 M10 13 l-2 6.5 M10 13 l1.6 6.5" />
+        <path d="M10 9.2 l4 2.2" />
+        <path d="M14 11.4 V20" />
+      </>
+    ) },
+  ];
+  const wrap = { hidden: {}, show: { transition: { staggerChildren: 0.13, delayChildren: 0.08 } } };
+  const item = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } };
+  return (
+    <motion.div
+      variants={wrap}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.6 }}
+      style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 36 }}
+    >
+      {items.map((m) => (
+        <motion.div
+          key={m.label}
+          variants={item}
+          style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "rgba(93,161,161,0.12)", border: "1px solid rgba(93,161,161,0.4)", color: "var(--ink)", borderRadius: 999, padding: "9px 17px 9px 13px", fontFamily: "var(--font-inter)", fontSize: "clamp(13px, 1.3vw, 15px)", fontWeight: 500 }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" style={{ flex: "0 0 auto" }} fill="none" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            {m.paths}
+          </svg>
+          {m.label}
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
 // Form sheets fossilized in the soil wall (panel 2): the same fields on every one.
 const FOSSILS = [
   { left: "6%", top: "14%", rot: -7, w: 200, speed: 60 },
@@ -491,24 +546,12 @@ function ScrollTaproot() {
         </H>
       </Panel>
 
-      {/* 6 — lateral galleries, present but not yet lit + the business line */}
-      <Panel
-        i={5}
-        progress={scrollYProgress}
-        backdrop={
-          <>
-            <div style={{ position: "absolute", left: "4%", top: "52%", ...mono, fontSize: 11, letterSpacing: "0.2em", color: "rgba(93,161,161,0.5)" }}>
-              group homes
-            </div>
-            <div style={{ position: "absolute", right: "4%", top: "60%", ...mono, fontSize: 11, letterSpacing: "0.2em", color: "rgba(93,161,161,0.5)" }}>
-              elder care
-            </div>
-          </>
-        }
-      >
+      {/* 6 — lateral galleries: the same spine serves other markets (icon pills) */}
+      <Panel i={5} progress={scrollYProgress}>
         <div style={{ textAlign: "center" }}>
           <H style={{ maxWidth: "30ch" }}>{PANELS[5].text}</H>
-          <div style={{ marginTop: 48 }}>
+          <MarketPills />
+          <div style={{ marginTop: 40 }}>
             <div aria-hidden style={{ width: 1, height: 34, background: "rgba(30,38,36,0.3)", margin: "0 auto 14px" }} />
             <div style={{ ...mono, fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(30,38,36,0.65)" }}>
               {BUSINESS_LINE}
