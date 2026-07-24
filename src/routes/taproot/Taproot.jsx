@@ -529,8 +529,6 @@ function ScrollTaproot() {
         </Suspense>
       </div>
 
-      {/* interactive pixel grid in the hero's white space */}
-      <ReactiveGrid />
       <CursorMosaic />
       <ColorTuner bridge={bridge} />
 
