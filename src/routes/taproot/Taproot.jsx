@@ -3,6 +3,7 @@
 // (Scene.jsx) renders root, soil and light only and positions the floating overlays
 // (tooltip pill, document cards, trace cards) by projecting 3D anchors each frame.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from "lenis";
 import Logo from "../../components/Logo.jsx";
@@ -95,23 +96,17 @@ const H = ({ children, size = "clamp(2rem, 5.2vw, 3.9rem)", style }) => (
 // "never reaches a kid." sinks in heavy from above — landing a hair low and a touch
 // under full weight, so the line arrives *not quite whole*, echoing the words. Plays
 // once on load; the reduced-motion path (StaticTaproot) renders it plainly instead.
-// A turquoise string physically strung between "reaches" and "a kid": a verlet rope
-// (fixed-length chain of points, gravity, both ends pinned to the live edges of the
-// two words). Pulled apart it draws taut; slack, it sags and folds/coils on itself
-// under its own weight, flimsy like real string. Reads the words' screen positions
-// every frame, so it follows the rubber-band exactly.
-function StringLink({ leftRef, rightRef, total = 320, startDelay = 1900 }) {
+// A straight 2px turquoise line strung across the negative space between "reaches"
+// and "a kid". It spans the live gap each frame, so as the rubber-band words pull
+// apart the line grows, and as they close it shrinks and is engulfed when they meet.
+function StringLink({ leftRef, rightRef, startDelay = 1900 }) {
   const canvasRef = useRef(null);
-  const totalRef = useRef(total);
-  totalRef.current = total;
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const N = 34; // more points: a long string needs resolution to fold smoothly
-    const pts = Array.from({ length: N }, () => ({ x: 0, y: 0, px: 0, py: 0 }));
-    let inited = false, raf = 0;
+    let raf = 0;
     const t0 = performance.now();
     const teal = getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1";
 
@@ -124,63 +119,28 @@ function StringLink({ leftRef, rightRef, total = 320, startDelay = 1900 }) {
     resize();
     window.addEventListener("resize", resize);
 
-    function anchors() {
-      const L = leftRef.current?.getBoundingClientRect();
-      const R = rightRef.current?.getBoundingClientRect();
-      if (!L || !R) return null;
-      // pin to the right edge of "reaches" and the left edge of "a kid", at their
-      // shared vertical centre, so the string lives exactly in the gap between them.
-      return { ax: L.right, ay: L.top + L.height * 0.55, bx: R.left, by: R.top + R.height * 0.55 };
-    }
-
     function loop(now) {
       raf = requestAnimationFrame(loop);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const a = anchors();
-      if (!a) return;
+      const L = leftRef.current?.getBoundingClientRect();
+      const R = rightRef.current?.getBoundingClientRect();
+      if (!L || !R) return;
+      const ax = L.right, ay = L.top + L.height * 0.55, bx = R.left, by = R.top + R.height * 0.55;
+      const gap = Math.hypot(bx - ax, by - ay);
+      // The line simply spans the live gap. As the words close it shrinks, and when
+      // they meet it's engulfed — no opacity fade, it just runs out of room.
+      if (gap < 7) return;
       const vis = Math.min(1, Math.max(0, (now - t0 - startDelay) / 320));
-      if (!inited) {
-        for (let i = 0; i < N; i++) {
-          const t = i / (N - 1);
-          pts[i].x = pts[i].px = a.ax + (a.bx - a.ax) * t;
-          pts[i].y = pts[i].py = a.ay + (a.by - a.ay) * t;
-        }
-        inited = true;
-      }
-      // verlet integrate interior points (gravity + inertia)
-      const grav = 0.4, damp = 0.98;
-      for (let i = 1; i < N - 1; i++) {
-        const p = pts[i], vx = (p.x - p.px) * damp, vy = (p.y - p.py) * damp;
-        p.px = p.x; p.py = p.y; p.x += vx; p.y += vy + grav;
-      }
-      // Rope length tracks the LIVE gap (always a touch longer -> a gentle sag that
-      // spans exactly between the words), with a floor so it folds when squeezed.
-      const gap = Math.hypot(a.bx - a.ax, a.by - a.ay);
-      const seg = Math.max(totalRef.current, gap * 1.06) / (N - 1);
-      for (let k = 0; k < 26; k++) {
-        pts[0].x = a.ax; pts[0].y = a.ay; pts[N - 1].x = a.bx; pts[N - 1].y = a.by;
-        for (let i = 0; i < N - 1; i++) {
-          const p = pts[i], q = pts[i + 1];
-          const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1e-4;
-          const diff = ((d - seg) / d) * 0.5, mx = dx * diff, my = dy * diff;
-          if (i !== 0) { p.x += mx; p.y += my; }
-          if (i + 1 !== N - 1) { q.x -= mx; q.y -= my; }
-        }
-      }
-      // draw as a smooth 5px turquoise string
+      if (vis <= 0) return;
       ctx.save();
       ctx.scale(dpr, dpr);
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < N - 1; i++) {
-        ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
-      }
-      ctx.lineTo(pts[N - 1].x, pts[N - 1].y);
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
       ctx.strokeStyle = teal;
       ctx.globalAlpha = vis;
-      ctx.lineWidth = 5;
+      ctx.lineWidth = 2;
       ctx.lineCap = "round";
-      ctx.lineJoin = "round";
       ctx.stroke();
       ctx.restore();
     }
@@ -188,7 +148,13 @@ function StringLink({ leftRef, rightRef, total = 320, startDelay = 1900 }) {
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
   }, [leftRef, rightRef, startDelay]);
 
-  return <canvas ref={canvasRef} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 4, pointerEvents: "none" }} />;
+  // Portal to <body>: a position:fixed canvas inside the hero's transformed wrapper
+  // would be offset by that transform. At the top level, fixed == viewport, so the
+  // canvas's viewport-space anchor coords line up exactly with the words.
+  return createPortal(
+    <canvas ref={canvasRef} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 4, pointerEvents: "none" }} />,
+    document.body
+  );
 }
 
 // The "Reach" (rubber-band): once the line has landed, "never reaches" and "a kid"
@@ -211,7 +177,7 @@ function ElasticReach({ left, right, p1Ref }) {
       const r = P.right - R.right;  // move "kid" right edge to "day" right edge (positive)
       const restGap = Math.max(2, R.left - L.right);
       // base fold length (floor); the string otherwise tracks the live gap each frame.
-      setPull({ l, r, total: Math.max(64, restGap * 4) });
+      setPull({ l, r, total: Math.max(48, restGap * 3) });
     };
     measure();
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
