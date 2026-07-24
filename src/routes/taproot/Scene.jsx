@@ -422,6 +422,32 @@ function World({ progress, bridge }) {
   }, []);
   useEffect(() => () => garden.forEach((p) => p.geom.dispose()), [garden]);
 
+  // Delicate roots fanning from the soil's underside: they spread wide across the
+  // width just below the surface, then curve inward and converge toward the central
+  // taproot — so the surface -> root hand-off reads as a natural root system leading
+  // the eye down, not one stiff pipe cutting to the next section.
+  const fanRoots = useMemo(() => {
+    const ySurf = SOIL_Y - SOIL_H * 0.5;
+    const N = 24;
+    const arr = [];
+    for (let i = 0; i < N; i++) {
+      const R = mulberry(9001 + i * 131);
+      const f = (i / (N - 1)) * 2 - 1;                         // -1..1 across the width
+      const xs = f * (6.0 + R() * 0.6) + (R() - 0.5) * 0.35;
+      const depth = 0.9 + R() * 2.2 + (1 - Math.abs(f)) * 2.6; // centre roots reach deeper
+      const wob = (R() - 0.5) * 1.0;
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(xs, ySurf + 0.06, (R() - 0.5) * 0.4),
+        new THREE.Vector3(xs * 0.72 + wob, ySurf - depth * 0.38, 0.16),
+        new THREE.Vector3(xs * 0.32, ySurf - depth * 0.74, 0.06),
+        new THREE.Vector3(xs * 0.06, ySurf - depth, 0.0),      // converge toward centre
+      ]);
+      arr.push({ geom: taperTube(curve, 64, 6, (u) => 0.05 * (1 - u) * (1 - u) + 0.006), endY: ySurf - depth });
+    }
+    return arr;
+  }, []);
+  useEffect(() => () => fanRoots.forEach((r) => r.geom.dispose()), [fanRoots]);
+
   // Dotted flicker materials (deep teal on the pale turquoise world).
   const mats = useMemo(
     () => ({
@@ -434,6 +460,8 @@ function World({ progress, bridge }) {
       shoot: makeDotMaterial("#3D8584", 0.34, 0.06, 0.0),
       // the soil block: a dense, near-static dotted band, same teal family as the root
       soil: makeDotMaterial("#2E6E6D", 0.46, 0.015, 0.0),
+      // delicate fanning surface roots — sparser (higher dropout) so they read fine
+      fan: makeDotMaterial("#2E6E6D", 0.32, 0.14, 0.0),
       // dithered, wind-swayed pixel plants on top of the soil
       plant: makePlantMaterial("#2E6E6D"),
     }),
@@ -546,6 +574,7 @@ function World({ progress, bridge }) {
     mats.lateral.uniforms.uTime.value = tNow;
     mats.shoot.uniforms.uTime.value = tNow;
     mats.soil.uniforms.uTime.value = tNow;
+    mats.fan.uniforms.uTime.value = tNow;
     mats.plant.uniforms.uTime.value = tNow;
     const b = bridge.current;
     const p = clamp01(progress.get());
@@ -708,6 +737,11 @@ function World({ progress, bridge }) {
       {/* a miniature garden of dithered pixel plants swaying on top of the soil */}
       {garden.map((p, i) => (
         <mesh key={`plant${i}`} geometry={p.geom} material={mats.plant} position={[p.x, p.y, p.z]} scale={p.scale} />
+      ))}
+
+      {/* delicate roots fanning from the soil underside, converging to the taproot */}
+      {fanRoots.map((r, i) => (
+        <mesh key={`fan${i}`} geometry={r.geom} material={mats.fan} />
       ))}
 
       {/* the taproot — the only saturated, emissive thing underground.
