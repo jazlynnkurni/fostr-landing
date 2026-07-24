@@ -711,8 +711,10 @@ function World({ progress, bridge }) {
       els.pill.style.pointerEvents = pillO > 0.4 ? "auto" : "none";
     }
 
-    // Four document cards fill in as their filaments arrive (panel 4).
-    const docFadeOut = 1 - clamp01((p - (PB[4] + 0.005)) / 0.025);
+    // Four document cards fill in as their filaments arrive (panel 4); they rise into
+    // place, then drift up and fade as the section exits.
+    const docExit = clamp01((p - (PB[4] + 0.005)) / 0.025);
+    const docFadeOut = 1 - docExit;
     for (let i = 0; i < 4; i++) {
       const el = els.cards[i];
       if (!el) continue;
@@ -721,34 +723,30 @@ function World({ progress, bridge }) {
       el.style.opacity = vis.toFixed(3);
       el.style.visibility = vis > 0.01 ? "visible" : "hidden";
       const [cx, cy] = proj(branchStuff.endpoints[i]);
-      el.style.transform = `translate3d(${cx.toFixed(1)}px, ${(cy + 10).toFixed(1)}px, 0) translate(-50%, 0)`;
+      const drift = (1 - arrive) * 16 - docExit * 54; // rise in, then rise away
+      el.style.transform = `translate3d(${cx.toFixed(1)}px, ${(cy + 10 + drift).toFixed(1)}px, 0) translate(-50%, 0)`;
     }
 
-    // Panel 5 overlays: court filing card (low), source note card (up near the root).
-    const p5vis =
-      p > PB[4] && p < PB[5] + 0.02
-        ? clamp01((p - (PB[4] + 0.004)) / 0.018) * (1 - clamp01((p - (PB[5] - 0.018)) / 0.018))
-        : 0;
+    // Panel 5 overlays: court filing (left) + source note (right), side by side,
+    // revealed together — rising in on enter, drifting up + fading on exit.
+    const p5enter = p > PB[4] ? clamp01((p - (PB[4] + 0.004)) / 0.02) : 0;
+    const p5exit = clamp01((p - (PB[5] - 0.02)) / 0.02);
+    const p5vis = p > PB[4] && p < PB[5] + 0.03 ? p5enter * (1 - p5exit) : 0;
+    const p5drift = (1 - p5enter) * 24 - p5exit * 60; // rise into place, then rise away
+    const cardY = h * 0.34 + p5drift;
     if (els.filing) {
-      const [fx] = proj(branchStuff.endpoints[2]);
-      const cx = Math.min(Math.max(fx, w * 0.5 - 120), w * 0.5 + 120);
       els.filing.style.opacity = p5vis.toFixed(3);
       els.filing.style.visibility = p5vis > 0.01 ? "visible" : "hidden";
-      els.filing.style.transform = `translate3d(${cx.toFixed(1)}px, ${(h * 0.58).toFixed(1)}px, 0) translate(-50%, 0)`;
+      els.filing.style.transform = `translate3d(${(w * 0.5 - 14).toFixed(1)}px, ${cardY.toFixed(1)}px, 0) translate(-100%, 0)`;
     }
     if (els.filingLine) {
       const hl = 0.1 + 0.26 * clamp01(t / 0.15);
       els.filingLine.style.background = `rgba(93,161,161,${hl.toFixed(3)})`;
     }
     if (els.source) {
-      const [sx, sy] = proj(branchStuff.sourcePoint);
-      const so = p5vis * clamp01((t - 0.68) / 0.2);
-      els.source.style.opacity = so.toFixed(3);
-      els.source.style.visibility = so > 0.01 ? "visible" : "hidden";
-      const cw = els.source.offsetWidth || 320;
-      const px = Math.min(Math.max(sx + 20, 12), w - cw - 12);
-      const py = Math.min(Math.max(sy, h * 0.12), h * 0.42);
-      els.source.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, 0)`;
+      els.source.style.opacity = p5vis.toFixed(3);
+      els.source.style.visibility = p5vis > 0.01 ? "visible" : "hidden";
+      els.source.style.transform = `translate3d(${(w * 0.5 + 14).toFixed(1)}px, ${cardY.toFixed(1)}px, 0)`;
     }
   });
 

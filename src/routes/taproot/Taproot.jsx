@@ -674,7 +674,7 @@ function ScrollTaproot() {
 
       {/* panel 5: court filing + source note */}
       <div style={{ position: "fixed", inset: 0, zIndex: 3, pointerEvents: "none" }}>
-        <div ref={setEl("filing")} style={{ ...overlayCard, width: "min(540px, 90vw)", padding: "16px 18px" }}>
+        <div ref={setEl("filing")} style={{ ...overlayCard, width: "min(440px, 45vw)", padding: "16px 18px" }}>
           <div style={{ ...mono, fontSize: 10, letterSpacing: "0.16em", color: "var(--teal)", marginBottom: 10 }}>
             {`${DEMO_DOCS[2].toUpperCase()} · DRAFT`}
           </div>
@@ -689,7 +689,7 @@ function ScrollTaproot() {
           ref={setEl("source")}
           style={{
             ...overlayCard,
-            width: "min(400px, 84vw)",
+            width: "min(400px, 45vw)",
             background: "rgba(255,255,255,0.92)",
             borderLeft: "2px solid var(--teal)",
             borderRadius: "6px 10px 10px 6px",
