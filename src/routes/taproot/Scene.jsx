@@ -462,7 +462,7 @@ function World({ progress, bridge }) {
   // at the underside and dithers out with depth (with a gentle downward-drifting
   // density wave), so the soil dissolves naturally into the earth and leaves room for
   // the next-section transition. Not roots — just soil bleeding through.
-  const SEEP_H = 4.2;
+  const SEEP_H = 2.3; // just long enough to bridge white -> turquoise; must clear the cards
   const seepGeom = useMemo(() => new THREE.PlaneGeometry(SOIL_W, SEEP_H), []);
 
   // Dotted flicker materials (deep teal on the pale turquoise world).
