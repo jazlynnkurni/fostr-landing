@@ -91,6 +91,75 @@ const H = ({ children, size = "clamp(2rem, 5.2vw, 3.9rem)", style }) => (
   <h2 style={{ fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: size, lineHeight: 1.1, letterSpacing: "-0.02em", margin: "0 auto", ...style }}>{children}</h2>
 );
 
+// Hero headline, kinetic. "Most of a caseworker's day" settles first; a beat later
+// "never reaches a kid." sinks in heavy from above — landing a hair low and a touch
+// under full weight, so the line arrives *not quite whole*, echoing the words. Plays
+// once on load; the reduced-motion path (StaticTaproot) renders it plainly instead.
+// The "Reach": once the line has landed, the word "reaches" slowly stretches
+// rightward toward "a kid" — straining across the gap, closing it to a hair but
+// never quite touching, then relaxing and reaching again. The typography enacts
+// the sentence: it is forever reaching, and it never gets there.
+function ReachWord({ children }) {
+  return (
+    <motion.span
+      style={{ display: "inline-block", transformOrigin: "0% 50%", whiteSpace: "nowrap" }}
+      initial={{ scaleX: 1 }}
+      animate={{ scaleX: [1, 1.06, 1.06, 1] }}
+      transition={{ duration: 3.4, times: [0, 0.42, 0.6, 1], ease: [0.33, 0, 0.2, 1], repeat: Infinity, repeatDelay: 0.7, delay: 2.0 }}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+// Wrap one word in the Reach animation, leaving the rest of the line static.
+function reachWord(text, word) {
+  const idx = text.indexOf(word);
+  if (idx < 0) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <ReachWord>{word}</ReachWord>
+      {text.slice(idx + word.length)}
+    </>
+  );
+}
+
+function HeroLine({ text }) {
+  const i = text.indexOf("never reaches");
+  const p1 = i > 0 ? text.slice(0, i).trim() : text;
+  const p2 = i > 0 ? text.slice(i) : "";
+  const base = {
+    fontFamily: "var(--font-sans)",
+    fontWeight: 800,
+    fontSize: "clamp(2.1rem, 5.4vw, 4.1rem)",
+    lineHeight: 1.12,
+    letterSpacing: "-0.02em",
+  };
+  return (
+    <h2 style={{ ...base, maxWidth: 880, margin: "0 auto", textWrap: "balance" }}>
+      <motion.span
+        style={{ display: "block" }}
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: 0.12 }}
+      >
+        {p1}
+      </motion.span>
+      {p2 && (
+        <motion.span
+          style={{ display: "block" }}
+          initial={{ opacity: 0, y: -44 }}
+          animate={{ opacity: 0.9, y: 3 }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.34, 1], delay: 0.95 }}
+        >
+          {reachWord(p2, "reaches")}
+        </motion.span>
+      )}
+    </h2>
+  );
+}
+
 // Form sheets fossilized in the soil wall (panel 2): the same fields on every one.
 const FOSSILS = [
   { left: "6%", top: "14%", rot: -7, w: 200, speed: 60 },
@@ -213,9 +282,7 @@ function ScrollTaproot() {
         color="var(--ink)"
       >
         <div style={{ textAlign: "center", transform: "translateY(-13vh)" }}>
-          <H size="clamp(2.4rem, 6vw, 4.6rem)" style={{ maxWidth: "18ch" }}>
-            {PANELS[0].text}
-          </H>
+          <HeroLine text={PANELS[0].text} />
         </div>
       </Panel>
 
