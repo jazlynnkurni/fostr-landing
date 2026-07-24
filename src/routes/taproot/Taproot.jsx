@@ -282,19 +282,80 @@ function PhraseIcon({ paths }) {
   );
 }
 
-// Render verbatim copy with an icon dropped in right after each keyed phrase.
+// A living tendril branches from the central taproot (screen centre) out to each
+// market icon — faint as the panel scrolls in, brightening the one you hover. The
+// interaction says the thing the copy says: one spine, reaching every market.
+function MarketRoots({ iconRefs, hover }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const teal = getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1";
+    const grow = new Array(8).fill(0);
+    let raf = 0;
+    const resize = () => { canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr; canvas.style.width = window.innerWidth + "px"; canvas.style.height = window.innerHeight + "px"; };
+    resize();
+    window.addEventListener("resize", resize);
+    function loop() {
+      raf = requestAnimationFrame(loop);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      const cx = window.innerWidth / 2;
+      iconRefs.current.forEach((el, i) => {
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const onScreen = r.top > window.innerHeight * 0.12 && r.bottom < window.innerHeight * 0.94;
+        grow[i] += ((onScreen ? 1 : 0) - grow[i]) * 0.08;             // ease in when in view
+        if (grow[i] < 0.02) return;
+        const iy = r.top + r.height / 2, ix = r.left + 2;
+        const hovered = hover === i;
+        const t = grow[i];
+        // branch from the spine (centre) out to the icon, drawn to `t`
+        const ex = cx + (ix - cx) * t, ey = iy + (iy - iy) * t;
+        ctx.beginPath();
+        ctx.moveTo(cx, iy);
+        ctx.quadraticCurveTo((cx + ix) / 2, iy + 14 * (ix > cx ? 1 : 1), ex, ey);
+        ctx.strokeStyle = teal;
+        ctx.globalAlpha = (hovered ? 0.85 : 0.28) * Math.min(1, t);
+        ctx.lineWidth = hovered ? 2.4 : 1.4;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      });
+    }
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+  }, [iconRefs, hover]);
+  return createPortal(<canvas ref={canvasRef} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none" }} />, document.body);
+}
+
+// Verbatim copy with an inline icon after each keyed phrase; hovering a phrase lights
+// its tendril from the spine (MarketRoots reads these icon refs + the hover index).
 function CopyWithIcons({ text }) {
+  const iconRefs = useRef([]);
+  const [hover, setHover] = useState(-1);
   const parts = text.split(/(child welfare|group homes|elder care)/i);
-  return parts.map((part, i) => {
+  let idx = 0;
+  const nodes = parts.map((part, i) => {
     const icon = PHRASE_ICONS[part.toLowerCase()];
     if (!icon) return <span key={i}>{part}</span>;
+    const my = idx++;
     return (
-      <span key={i} style={{ whiteSpace: "nowrap" }}>
+      <span key={i} style={{ whiteSpace: "nowrap", cursor: "default" }} onPointerEnter={() => setHover(my)} onPointerLeave={() => setHover(-1)}>
         {part}
-        <PhraseIcon paths={icon} />
+        <span ref={(el) => (iconRefs.current[my] = el)} style={{ display: "inline-block" }}>
+          <PhraseIcon paths={icon} />
+        </span>
       </span>
     );
   });
+  return (
+    <>
+      {nodes}
+      <MarketRoots iconRefs={iconRefs} hover={hover} />
+    </>
+  );
 }
 
 // Form sheets fossilized in the soil wall (panel 2): the same fields on every one.
