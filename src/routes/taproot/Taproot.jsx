@@ -95,72 +95,190 @@ const H = ({ children, size = "clamp(2rem, 5.2vw, 3.9rem)", style }) => (
 // "never reaches a kid." sinks in heavy from above — landing a hair low and a touch
 // under full weight, so the line arrives *not quite whole*, echoing the words. Plays
 // once on load; the reduced-motion path (StaticTaproot) renders it plainly instead.
+// A turquoise string physically strung between "reaches" and "a kid": a verlet rope
+// (fixed-length chain of points, gravity, both ends pinned to the live edges of the
+// two words). Pulled apart it draws taut; slack, it sags and folds/coils on itself
+// under its own weight, flimsy like real string. Reads the words' screen positions
+// every frame, so it follows the rubber-band exactly.
+function StringLink({ leftRef, rightRef, total = 320, startDelay = 1900 }) {
+  const canvasRef = useRef(null);
+  const totalRef = useRef(total);
+  totalRef.current = total;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const N = 34; // more points: a long string needs resolution to fold smoothly
+    const pts = Array.from({ length: N }, () => ({ x: 0, y: 0, px: 0, py: 0 }));
+    let inited = false, raf = 0;
+    const t0 = performance.now();
+    const teal = getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1";
+
+    function resize() {
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height = window.innerHeight + "px";
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    function anchors() {
+      const L = leftRef.current?.getBoundingClientRect();
+      const R = rightRef.current?.getBoundingClientRect();
+      if (!L || !R) return null;
+      // pin to the right edge of "reaches" and the left edge of "a kid", at their
+      // shared vertical centre, so the string lives exactly in the gap between them.
+      return { ax: L.right, ay: L.top + L.height * 0.55, bx: R.left, by: R.top + R.height * 0.55 };
+    }
+
+    function loop(now) {
+      raf = requestAnimationFrame(loop);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const a = anchors();
+      if (!a) return;
+      const vis = Math.min(1, Math.max(0, (now - t0 - startDelay) / 320));
+      if (!inited) {
+        for (let i = 0; i < N; i++) {
+          const t = i / (N - 1);
+          pts[i].x = pts[i].px = a.ax + (a.bx - a.ax) * t;
+          pts[i].y = pts[i].py = a.ay + (a.by - a.ay) * t;
+        }
+        inited = true;
+      }
+      // verlet integrate interior points (gravity + inertia)
+      const grav = 0.4, damp = 0.98;
+      for (let i = 1; i < N - 1; i++) {
+        const p = pts[i], vx = (p.x - p.px) * damp, vy = (p.y - p.py) * damp;
+        p.px = p.x; p.py = p.y; p.x += vx; p.y += vy + grav;
+      }
+      // Rope length tracks the LIVE gap (always a touch longer -> a gentle sag that
+      // spans exactly between the words), with a floor so it folds when squeezed.
+      const gap = Math.hypot(a.bx - a.ax, a.by - a.ay);
+      const seg = Math.max(totalRef.current, gap * 1.06) / (N - 1);
+      for (let k = 0; k < 26; k++) {
+        pts[0].x = a.ax; pts[0].y = a.ay; pts[N - 1].x = a.bx; pts[N - 1].y = a.by;
+        for (let i = 0; i < N - 1; i++) {
+          const p = pts[i], q = pts[i + 1];
+          const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 1e-4;
+          const diff = ((d - seg) / d) * 0.5, mx = dx * diff, my = dy * diff;
+          if (i !== 0) { p.x += mx; p.y += my; }
+          if (i + 1 !== N - 1) { q.x -= mx; q.y -= my; }
+        }
+      }
+      // draw as a smooth 5px turquoise string
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < N - 1; i++) {
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
+      }
+      ctx.lineTo(pts[N - 1].x, pts[N - 1].y);
+      ctx.strokeStyle = teal;
+      ctx.globalAlpha = vis;
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.restore();
+    }
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+  }, [leftRef, rightRef, startDelay]);
+
+  return <canvas ref={canvasRef} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 4, pointerEvents: "none" }} />;
+}
+
 // The "Reach" (rubber-band): once the line has landed, "never reaches" and "a kid"
-// — both undistorted — get pulled apart, the space between them stretching like a
-// tensioned rubber band, then snap back together and overshoot into a damped
-// bounce before settling. The gap itself enacts the sentence: strained toward each
-// other, never at rest. Loops slowly.
-function ElasticReach({ left, right }) {
-  // keyframes: rest -> pulled apart -> snap past centre (compress) -> rebound -> settle
-  const times = [0, 0.4, 0.62, 0.78, 0.9];
+// — both undistorted — get pulled apart until "never" sits under "Most" and "kid"
+// under "day" (measured from the first line's rendered width), then snap back and
+// overshoot into a damped bounce. A turquoise string strung between them goes taut
+// on the pull and folds on the release. Loops slowly.
+function ElasticReach({ left, right, p1Ref }) {
+  const leftRef = useRef(null);
+  const rightRef = useRef(null);
+  // pull.l / pull.r = px each chunk travels to reach the line-1 edges; total = rope length
+  const [pull, setPull] = useState({ l: -150, r: 150, total: 320 });
+  useEffect(() => {
+    const measure = () => {
+      const P = p1Ref.current?.getBoundingClientRect();
+      const L = leftRef.current?.getBoundingClientRect();
+      const R = rightRef.current?.getBoundingClientRect();
+      if (!P || !L || !R || P.width < 4) return;
+      const l = P.left - L.left;   // move "never" left edge to "Most" left edge (negative)
+      const r = P.right - R.right;  // move "kid" right edge to "day" right edge (positive)
+      const restGap = Math.max(2, R.left - L.right);
+      // base fold length (floor); the string otherwise tracks the live gap each frame.
+      setPull({ l, r, total: Math.max(64, restGap * 4) });
+    };
+    measure();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    const id = setTimeout(measure, 400);
+    window.addEventListener("resize", measure);
+    return () => { clearTimeout(id); window.removeEventListener("resize", measure); };
+  }, [p1Ref]);
+
   const t = {
-    duration: 3.0,
-    times,
+    duration: 3.4,
+    times: [0, 0.42, 0.64, 0.8, 0.9],
     ease: ["easeOut", "easeIn", "easeOut", "easeInOut"],
     repeat: Infinity,
-    repeatDelay: 0.5,
+    repeatDelay: 0.6,
     delay: 2.0,
   };
   return (
     <span style={{ whiteSpace: "nowrap" }}>
-      <motion.span style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, -12, 3, -1.4, 0] }} transition={t}>
+      <motion.span ref={leftRef} style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, pull.l, 6, -2.5, 0] }} transition={t}>
         {left}
       </motion.span>
       {" "}
-      <motion.span style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, 12, -3, 1.4, 0] }} transition={t}>
+      <motion.span ref={rightRef} style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: [0, pull.r, -6, 2.5, 0] }} transition={t}>
         {right}
       </motion.span>
+      <StringLink leftRef={leftRef} rightRef={rightRef} total={pull.total} />
     </span>
   );
-}
-
-// Split "never reaches a kid." into the two chunks the rubber band pulls apart.
-function reachLine(text) {
-  const cut = text.indexOf("reaches") + "reaches".length;
-  if (cut < "reaches".length) return text;
-  return <ElasticReach left={text.slice(0, cut)} right={text.slice(cut).trimStart()} />;
 }
 
 function HeroLine({ text }) {
   const i = text.indexOf("never reaches");
   const p1 = i > 0 ? text.slice(0, i).trim() : text;
   const p2 = i > 0 ? text.slice(i) : "";
+  const cut = p2.indexOf("reaches") + "reaches".length;
+  const leftChunk = cut > 0 ? p2.slice(0, cut) : p2;
+  const rightChunk = cut > 0 ? p2.slice(cut).trimStart() : "";
+  const p1Ref = useRef(null);
   const base = {
     fontFamily: "var(--font-sans)",
-    fontWeight: 800,
+    fontWeight: 500, // both lines medium
     fontSize: "clamp(2.1rem, 5.4vw, 4.1rem)",
     lineHeight: 1.12,
     letterSpacing: "-0.02em",
   };
   return (
-    <h2 style={{ ...base, maxWidth: 880, margin: "0 auto", textWrap: "balance" }}>
-      <motion.span
-        style={{ display: "block" }}
-        initial={{ opacity: 0, y: -6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: 0.12 }}
-      >
-        {p1}
-      </motion.span>
-      {p2 && (
+    <h2 style={{ ...base, maxWidth: 880, margin: "0 auto" }}>
+      <div style={{ textAlign: "center" }}>
         <motion.span
-          style={{ display: "block" }}
+          ref={p1Ref}
+          style={{ display: "inline-block", fontWeight: 500 }}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: 0.12 }}
+        >
+          {p1}
+        </motion.span>
+      </div>
+      {p2 && (
+        <motion.div
+          style={{ textAlign: "center" }}
           initial={{ opacity: 0, y: -44 }}
           animate={{ opacity: 0.9, y: 3 }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.34, 1], delay: 0.95 }}
         >
-          {reachLine(p2)}
-        </motion.span>
+          <ElasticReach left={leftChunk} right={rightChunk} p1Ref={p1Ref} />
+        </motion.div>
       )}
     </h2>
   );
