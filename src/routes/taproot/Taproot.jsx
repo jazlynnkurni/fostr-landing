@@ -246,116 +246,56 @@ function HeroLine({ text }) {
   );
 }
 
-// Inline icons that sit right beside their phrase in the copy, so the meaning lands
-// instantly: a smile for child welfare, a house for group homes, an elder for elder care.
+// Inline icons beside their phrase in the copy — solid WHITE so they read prominently
+// on the turquoise ground: a smiley for child welfare, a house for group homes, an
+// elder for elder care.
+const INK = "#1E2624";
 const PHRASE_ICONS = {
   "child welfare": (
     <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M8.4 13.6 Q12 16.8 15.6 13.6" />
-      <circle cx="9.4" cy="10" r="0.7" fill="var(--teal)" stroke="none" />
-      <circle cx="14.6" cy="10" r="0.7" fill="var(--teal)" stroke="none" />
+      <circle cx="12" cy="12" r="9" fill="#fff" />
+      <circle cx="9.2" cy="10.3" r="1.05" fill={INK} />
+      <circle cx="14.8" cy="10.3" r="1.05" fill={INK} />
+      <path d="M8.2 13.9 Q12 17.3 15.8 13.9" fill="none" stroke={INK} strokeWidth="1.5" strokeLinecap="round" />
     </>
   ),
   "group homes": (
     <>
-      <path d="M4 11 L12 5 L20 11" />
-      <path d="M6 10 V19 H18 V10" />
-      <path d="M10 19 V14.5 H14 V19" />
+      <path d="M12 3.4 L21.4 11 L21.4 20.8 L2.6 20.8 L2.6 11 Z" fill="#fff" />
+      <rect x="9.7" y="14.4" width="4.6" height="6.4" fill={INK} />
     </>
   ),
   "elder care": (
     <>
-      <circle cx="10" cy="5.5" r="2.2" />
-      <path d="M10 7.7 V13.5 M10 13.5 l-2 6 M10 13.5 l1.6 6" />
-      <path d="M10 9.6 l3.8 2" />
-      <path d="M13.8 11.6 V20" />
+      <circle cx="10" cy="4.8" r="2.5" fill="#fff" />
+      <path d="M10 7.4 V13 M10 13 l-1.8 7.2 M10 13 l1.4 7.2" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 9.4 l3.7 1.9" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" />
+      <path d="M13.7 11 V20.8" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" />
     </>
   ),
 };
 
 function PhraseIcon({ paths }) {
   return (
-    <svg viewBox="0 0 24 24" width="0.95em" height="0.95em" aria-hidden style={{ display: "inline-block", verticalAlign: "-0.08em", margin: "0 0.06em 0 0.3em" }} fill="none" stroke="var(--teal)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="1.02em" height="1.02em" aria-hidden style={{ display: "inline-block", verticalAlign: "-0.13em", margin: "0 0.04em 0 0.3em", filter: "drop-shadow(0 1px 2px rgba(23,58,57,0.18))" }}>
       {paths}
     </svg>
   );
 }
 
-// A living tendril branches from the central taproot (screen centre) out to each
-// market icon — faint as the panel scrolls in, brightening the one you hover. The
-// interaction says the thing the copy says: one spine, reaching every market.
-function MarketRoots({ iconRefs, hover }) {
-  const canvasRef = useRef(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const teal = getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1";
-    const grow = new Array(8).fill(0);
-    let raf = 0;
-    const resize = () => { canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr; canvas.style.width = window.innerWidth + "px"; canvas.style.height = window.innerHeight + "px"; };
-    resize();
-    window.addEventListener("resize", resize);
-    function loop() {
-      raf = requestAnimationFrame(loop);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      const cx = window.innerWidth / 2;
-      iconRefs.current.forEach((el, i) => {
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const onScreen = r.top > window.innerHeight * 0.12 && r.bottom < window.innerHeight * 0.94;
-        grow[i] += ((onScreen ? 1 : 0) - grow[i]) * 0.08;             // ease in when in view
-        if (grow[i] < 0.02) return;
-        const iy = r.top + r.height / 2, ix = r.left + 2;
-        const hovered = hover === i;
-        const t = grow[i];
-        // branch from the spine (centre) out to the icon, drawn to `t`
-        const ex = cx + (ix - cx) * t, ey = iy + (iy - iy) * t;
-        ctx.beginPath();
-        ctx.moveTo(cx, iy);
-        ctx.quadraticCurveTo((cx + ix) / 2, iy + 14 * (ix > cx ? 1 : 1), ex, ey);
-        ctx.strokeStyle = teal;
-        ctx.globalAlpha = (hovered ? 0.85 : 0.28) * Math.min(1, t);
-        ctx.lineWidth = hovered ? 2.4 : 1.4;
-        ctx.lineCap = "round";
-        ctx.stroke();
-      });
-    }
-    raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
-  }, [iconRefs, hover]);
-  return createPortal(<canvas ref={canvasRef} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none" }} />, document.body);
-}
-
-// Verbatim copy with an inline icon after each keyed phrase; hovering a phrase lights
-// its tendril from the spine (MarketRoots reads these icon refs + the hover index).
+// Verbatim copy with an inline white icon dropped in right after each keyed phrase.
 function CopyWithIcons({ text }) {
-  const iconRefs = useRef([]);
-  const [hover, setHover] = useState(-1);
   const parts = text.split(/(child welfare|group homes|elder care)/i);
-  let idx = 0;
-  const nodes = parts.map((part, i) => {
+  return parts.map((part, i) => {
     const icon = PHRASE_ICONS[part.toLowerCase()];
     if (!icon) return <span key={i}>{part}</span>;
-    const my = idx++;
     return (
-      <span key={i} style={{ whiteSpace: "nowrap", cursor: "default" }} onPointerEnter={() => setHover(my)} onPointerLeave={() => setHover(-1)}>
+      <span key={i} style={{ whiteSpace: "nowrap" }}>
         {part}
-        <span ref={(el) => (iconRefs.current[my] = el)} style={{ display: "inline-block" }}>
-          <PhraseIcon paths={icon} />
-        </span>
+        <PhraseIcon paths={icon} />
       </span>
     );
   });
-  return (
-    <>
-      {nodes}
-      <MarketRoots iconRefs={iconRefs} hover={hover} />
-    </>
-  );
 }
 
 // Form sheets fossilized in the soil wall (panel 2): the same fields on every one.
@@ -620,7 +560,7 @@ function ScrollTaproot() {
       <Panel i={6} progress={scrollYProgress} color="var(--ink)">
         <div style={{ maxWidth: "34ch", margin: "0 auto" }}>
           <p style={{ fontWeight: 400, fontSize: 17, lineHeight: 1.7, margin: 0 }}>{PANELS[6].text}</p>
-          <p style={{ color: "#8F7119", fontSize: 13, marginTop: 22 }}>{`— ${PANELS[6].attribution}`}</p>
+          <p style={{ color: "#8F7119", fontSize: 13, marginTop: 22, fontStyle: "italic" }}>{PANELS[6].attribution}</p>
         </div>
       </Panel>
 
