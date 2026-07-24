@@ -440,6 +440,8 @@ function World({ progress, bridge }) {
     []
   );
   useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
+  // expose materials so the ?tune color panel can edit uColor live
+  useEffect(() => { bridge.current.mats = mats; return () => { if (bridge.current) bridge.current.mats = null; }; }, [mats, bridge]);
 
   // Branch endpoints depend on viewport aspect so the four cards stay on screen
   // (2x2 on narrow phones, 4 across on desktop). Bucketed to avoid rebuild churn.

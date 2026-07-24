@@ -343,6 +343,34 @@ function ReactiveGrid() {
   return <canvas ref={ref} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none" }} />;
 }
 
+// Dev-only live colour tuner (open /taproot?tune). Edits the R3F materials' uColor
+// uniforms in place so you can dial the soil/root/meadow colours and read the hex.
+function ColorTuner({ bridge }) {
+  const [, force] = useState(0);
+  useEffect(() => { const id = setInterval(() => force((x) => x + 1), 400); return () => clearInterval(id); }, []);
+  if (typeof window === "undefined" || !/(\?|&)tune/.test(window.location.search)) return null;
+  const fields = [["soil", "Soil block"], ["root", "Main root"], ["branch", "Branches"], ["lateral", "Laterals"], ["shoot", "Shoot"], ["plant", "Meadow"]];
+  const mats = bridge.current.mats;
+  const get = (k) => (mats?.[k] ? "#" + mats[k].uniforms.uColor.value.getHexString() : "#2e6e6d");
+  const set = (k, v) => { if (mats?.[k]) { mats[k].uniforms.uColor.value.set(v); force((x) => x + 1); } };
+  return (
+    <div style={{ position: "fixed", top: 16, right: 16, zIndex: 30, background: "rgba(255,255,255,.96)", border: "1px solid rgba(0,0,0,.12)", borderRadius: 12, padding: "14px 16px", fontFamily: "var(--font-inter), sans-serif", fontSize: 12, color: "#1E2624", boxShadow: "0 10px 40px rgba(0,0,0,.16)", display: "grid", gap: 9, minWidth: 210 }}>
+      <div style={{ fontWeight: 700, letterSpacing: ".02em" }}>Colour tuner</div>
+      {!mats && <div style={{ color: "#999" }}>loading scene…</div>}
+      {fields.map(([k, label]) => (
+        <label key={k} style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
+          <span>{label}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <code style={{ fontSize: 11, color: "#666" }}>{get(k)}</code>
+            <input type="color" value={get(k)} onChange={(e) => set(k, e.target.value)} style={{ width: 30, height: 24, border: "none", background: "none", padding: 0, cursor: "pointer" }} />
+          </span>
+        </label>
+      ))}
+      <div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>edits live · copy the hex you like</div>
+    </div>
+  );
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -402,6 +430,7 @@ function ScrollTaproot() {
 
       {/* interactive pixel grid in the hero's white space */}
       <ReactiveGrid />
+      <ColorTuner bridge={bridge} />
 
       {/* warm ground for germination */}
       <motion.div
