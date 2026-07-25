@@ -473,8 +473,10 @@ function CursorMosaic() {
 }
 
 // Panel-3 backdrop ("Not the worker's fault... no one chose this for love of
-// paperwork"): an endless, faint drift of little form-cards falling behind the text —
-// the paperwork that never stops, and drifting away from the cursor if you brush it.
+// paperwork"): an endless drift of PIXELATED form-cards falling behind the text. Each
+// form is drawn as a dot grid (matching the ascii-pixel world); hover over one and it
+// dissolves — its pixels scatter and dither away, then a fresh form falls in.
+function pf(n) { n = Math.sin(n * 12.9898) * 43758.5453; return n - Math.floor(n); }
 function Paperfall() {
   const ref = useRef(null);
   useEffect(() => {
@@ -486,14 +488,11 @@ function Paperfall() {
     const mouse = { x: -1e4, y: -1e4 };
     let s = 12345;
     const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-    function build() {
-      sheets = [];
-      const n = Math.round((W * H) / 32000);
-      for (let i = 0; i < n; i++) {
-        const w = 38 + rnd() * 40;
-        sheets.push({ x: rnd() * W, y: rnd() * H, w, h: w * (0.66 + rnd() * 0.12), vy: 12 + rnd() * 30, rot: (rnd() - 0.5) * 0.5, vr: (rnd() - 0.5) * 0.2, a: 0.16 + rnd() * 0.22 });
-      }
-    }
+    const spawn = (top) => {
+      const w = 44 + rnd() * 42;
+      return { x: rnd() * W, y: top ? -w : rnd() * H, w, h: w * (0.68 + rnd() * 0.12), vy: 12 + rnd() * 26, rot: (rnd() - 0.5) * 0.44, vr: (rnd() - 0.5) * 0.18, a: 0.5 + rnd() * 0.35, seed: rnd() * 900, diss: 0 };
+    };
+    function build() { sheets = []; const n = Math.round((W * H) / 34000); for (let i = 0; i < n; i++) sheets.push(spawn(false)); }
     function resize() { const r = canvas.getBoundingClientRect(); W = r.width; H = r.height; canvas.width = W * dpr; canvas.height = H * dpr; build(); }
     resize();
     const ro = new ResizeObserver(resize);
@@ -501,36 +500,45 @@ function Paperfall() {
     const move = (e) => { const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; };
     window.addEventListener("pointermove", move, { passive: true });
     let last = performance.now();
+    const C = 4.5; // pixel cell size
     function loop(now) {
       raf = requestAnimationFrame(loop);
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
-      for (const p of sheets) {
+      for (let si = 0; si < sheets.length; si++) {
+        const p = sheets[si];
         p.y += p.vy * dt;
         p.rot += p.vr * dt;
-        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
-        if (d < 130) { p.x += (dx / (d || 1)) * (1 - d / 130) * 2.4; }
-        if (p.y - p.h > H) { p.y = -p.h; p.x = rnd() * W; }
+        // hover -> dissolve; move away -> re-form
+        const d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+        p.diss += (d < p.w * 0.85 ? 2.6 : -1.6) * dt;
+        if (p.diss < 0) p.diss = 0;
+        if (p.diss >= 1 || p.y - p.h > H) { sheets[si] = spawn(true); continue; }
+
+        const cols = Math.max(7, Math.round(p.w / C)), rows = Math.max(6, Math.round(p.h / C));
+        const cw = p.w / cols, ch = p.h / rows;
+        const lines = [Math.round(rows * 0.32), Math.round(rows * 0.52), Math.round(rows * 0.72)];
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rot);
-        ctx.globalAlpha = p.a;
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "rgba(46,110,109,0.55)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(-p.w / 2, -p.h / 2, p.w, p.h, 3);
-        else ctx.rect(-p.w / 2, -p.h / 2, p.w, p.h);
-        ctx.fill();
-        ctx.stroke();
-        ctx.strokeStyle = "rgba(30,38,36,0.3)";
-        for (let i = 0; i < 3; i++) {
-          const yy = -p.h / 2 + p.h * 0.28 + i * (p.h * 0.2);
-          ctx.beginPath();
-          ctx.moveTo(-p.w / 2 + 5, yy);
-          ctx.lineTo(p.w / 2 - 5 - (i === 2 ? p.w * 0.28 : 0), yy);
-          ctx.stroke();
+        const scatter = p.diss * 9;
+        for (let cy = 0; cy < rows; cy++) {
+          for (let cx = 0; cx < cols; cx++) {
+            const border = cx === 0 || cx === cols - 1 || cy === 0 || cy === rows - 1;
+            const li = lines.indexOf(cy);
+            const line = li >= 0 && cx > 0 && cx < cols - 1 - (li === 2 ? Math.round(cols * 0.3) : 0);
+            const fill = !border && !line && pf(cx * 3.1 + cy * 7.3 + p.seed) < 0.05;
+            if (!border && !line && !fill) continue;
+            const key = pf(cx * 13.1 + cy * 6.7 + p.seed * 1.7);
+            if (key < p.diss) continue; // this pixel has dissolved
+            const w = border ? 1 : line ? 0.8 : 0.45;
+            const jx = (pf(cx + cy * 2 + p.seed) - 0.5) * scatter;
+            const jy = (pf(cx * 2 + cy + p.seed) - 0.5) * scatter;
+            ctx.globalAlpha = p.a * w * (1 - p.diss * 0.4);
+            ctx.fillStyle = "#3D8584";
+            ctx.fillRect(-p.w / 2 + cx * cw + jx, -p.h / 2 + cy * ch + jy, cw * 0.82, ch * 0.82);
+          }
         }
         ctx.restore();
       }
