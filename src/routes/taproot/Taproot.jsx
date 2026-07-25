@@ -488,9 +488,9 @@ function Paperfall() {
     const mouse = { x: -1e4, y: -1e4 };
     let s = 12345;
     const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-    const spawn = (top) => {
+    const spawn = (fromBottom) => {
       const w = 44 + rnd() * 42;
-      return { x: rnd() * W, y: top ? -w : rnd() * H, w, h: w * (0.68 + rnd() * 0.12), vy: 12 + rnd() * 26, rot: (rnd() - 0.5) * 0.44, vr: (rnd() - 0.5) * 0.18, a: 0.5 + rnd() * 0.35, seed: rnd() * 900, diss: 0 };
+      return { x: rnd() * W, y: fromBottom ? H + w : rnd() * H, w, h: w * (0.68 + rnd() * 0.12), vy: 12 + rnd() * 26, rot: (rnd() - 0.5) * 0.44, vr: (rnd() - 0.5) * 0.18, a: 0.5 + rnd() * 0.35, seed: rnd() * 900, diss: 0 };
     };
     function build() { sheets = []; const n = Math.round((W * H) / 34000); for (let i = 0; i < n; i++) sheets.push(spawn(false)); }
     function resize() { const r = canvas.getBoundingClientRect(); W = r.width; H = r.height; canvas.width = W * dpr; canvas.height = H * dpr; build(); }
@@ -508,13 +508,13 @@ function Paperfall() {
       ctx.clearRect(0, 0, W, H);
       for (let si = 0; si < sheets.length; si++) {
         const p = sheets[si];
-        p.y += p.vy * dt;
+        p.y -= p.vy * dt; // paperwork rises upward
         p.rot += p.vr * dt;
         // hover -> dissolve; move away -> re-form
         const d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
         p.diss += (d < p.w * 0.85 ? 2.6 : -1.6) * dt;
         if (p.diss < 0) p.diss = 0;
-        if (p.diss >= 1 || p.y - p.h > H) { sheets[si] = spawn(true); continue; }
+        if (p.diss >= 1 || p.y + p.h < 0) { sheets[si] = spawn(true); continue; }
 
         const cols = Math.max(7, Math.round(p.w / C)), rows = Math.max(6, Math.round(p.h / C));
         const cw = p.w / cols, ch = p.h / rows;
