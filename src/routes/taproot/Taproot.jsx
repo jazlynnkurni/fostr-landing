@@ -591,54 +591,31 @@ function PixelImage({ src, progress, range, label }) {
     img.src = src;
     resize();
     const ro = new ResizeObserver(resize); ro.observe(wrap);
-    // hover ripple: rings of tiles lift and revert as they pass under the cursor
-    let hover = false, mx = 0, my = 0, t0 = performance.now();
-    const move = (e) => { const r = canvas.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; hover = true; };
-    const leave = () => { hover = false; };
-    canvas.addEventListener("pointermove", move);
-    canvas.addEventListener("pointerleave", leave);
-    function draw(reveal, t) {
+    function draw(reveal) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       if (!loaded) return;
-      const rippling = hover && reveal >= 0.999;
-      if (reveal >= 0.999 && !rippling) { ctx.drawImage(img, 0, 0, W, H); return; }
+      if (reveal >= 0.999) { ctx.drawImage(img, 0, 0, W, H); return; }
       const cell = Math.max(8, W / 100);
       const cols = Math.ceil(W / cell), rows = Math.ceil(H / cell);
       const sxc = iw / cols, syc = ih / rows;
-      const R = 240;
       for (let cy = 0; cy < rows; cy++) {
         for (let cx = 0; cx < cols; cx++) {
-          if (reveal < 0.999 && pf(cx * 12.3 + cy * 7.13 + 0.5) > reveal) continue;
-          let px = cx * cell, py = cy * cell, sz = cell + 0.7;
-          if (rippling) {
-            const ccx = px + cell / 2, ccy = py + cell / 2;
-            const dd = Math.hypot(ccx - mx, ccy - my);
-            const fall = Math.max(0, 1 - dd / R);
-            if (fall > 0) {
-              const wave = Math.sin(dd * 0.07 - t * 8) * fall;
-              if (wave > 0.72) continue; // crest of the wave: this tile reverts (gap)
-              const disp = wave * 12;
-              px += ((ccx - mx) / (dd || 1)) * disp;
-              py += ((ccy - my) / (dd || 1)) * disp;
-              sz += Math.abs(wave) * 1.5;
-            }
-          }
-          ctx.drawImage(img, cx * sxc, cy * syc, sxc, syc, px, py, sz, sz);
+          if (pf(cx * 12.3 + cy * 7.13 + 0.5) > reveal) continue;
+          ctx.drawImage(img, cx * sxc, cy * syc, sxc, syc, cx * cell, cy * cell, cell + 0.7, cell + 0.7);
         }
       }
     }
-    function loop(now) {
+    function loop() {
       raf = requestAnimationFrame(loop);
       const p = progress.get();
       const reveal = Math.min(1, Math.max(0, (p - range[0]) / (range[1] - range[0])));
-      const changed = Math.abs(reveal - lastR) >= 0.004 || (reveal >= 0.999 && lastR < 0.999);
-      if (!changed && !hover) return; // redraw on reveal change or while hovering (ripple)
+      if (Math.abs(reveal - lastR) < 0.004 && !(reveal >= 0.999 && lastR < 0.999)) return;
       lastR = reveal;
-      draw(reveal, (now - t0) / 1000);
+      draw(reveal);
     }
     raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerleave", leave); };
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [src, progress, range]);
   return (
     <div ref={wrapRef} role="img" aria-label={label} style={{ position: "relative", width: "100%" }}>
