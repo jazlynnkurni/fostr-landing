@@ -183,18 +183,26 @@ function ElasticReach({ left, right, p1Ref, active }) {
     return () => { clearTimeout(id); window.removeEventListener("resize", measure); };
   }, [p1Ref]);
 
-  // enter: smooth spring spread. leave: recoil that bumps to just-touching (never
-  // crossing) then settles — [null] keeps the start from wherever it currently is.
-  const enter = { type: "spring", stiffness: 130, damping: 20, mass: 0.9 };
-  const recoil = { duration: 0.5, times: [0, 0.58, 1], ease: ["easeIn", "easeOut"] };
+  // Only bounce once the user has actually hovered — otherwise the recoil keyframes
+  // fire on mount and the line jitters on load.
+  const touched = useRef(false);
+  if (active) touched.current = true;
+
+  // enter: smooth spring spread. leave: a small damped double-bounce that snaps the
+  // words to just-touching then settles (bounded so they never overlap).
+  const t = Math.max(3, pull.touch);
+  const enter = { type: "spring", stiffness: 140, damping: 18, mass: 0.9 };
+  const recoil = { duration: 0.62, times: [0, 0.42, 0.68, 0.86, 1], ease: "easeOut" };
   const trans = active ? enter : recoil;
+  const leftX = active ? pull.l : touched.current ? [null, t, -t * 0.5, t * 0.2, 0] : 0;
+  const rightX = active ? pull.r : touched.current ? [null, -t, t * 0.5, -t * 0.2, 0] : 0;
   return (
     <span style={{ whiteSpace: "nowrap" }}>
-      <motion.span ref={leftRef} style={{ display: "inline-block" }} animate={{ x: active ? pull.l : [null, pull.touch, 0] }} transition={trans}>
+      <motion.span ref={leftRef} style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: leftX }} transition={trans}>
         {left}
       </motion.span>
       {" "}
-      <motion.span ref={rightRef} style={{ display: "inline-block" }} animate={{ x: active ? pull.r : [null, -pull.touch, 0] }} transition={trans}>
+      <motion.span ref={rightRef} style={{ display: "inline-block" }} initial={{ x: 0 }} animate={{ x: rightX }} transition={trans}>
         {right}
       </motion.span>
       <StringLink leftRef={leftRef} rightRef={rightRef} />

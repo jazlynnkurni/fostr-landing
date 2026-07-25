@@ -10,8 +10,9 @@ import Worklight from "./routes/worklight/Worklight.jsx";
 import Faq from "./pages/Faq.jsx";
 
 const router = createBrowserRouter([
-  { path: "/", element: <Home /> },
+  { path: "/", element: <Taproot /> },
   { path: "/taproot", element: <Taproot /> },
+  { path: "/concepts", element: <Home /> },
   { path: "/record", element: <Record /> },
   { path: "/survey", element: <Survey /> },
   { path: "/worklight", element: <Worklight /> },
