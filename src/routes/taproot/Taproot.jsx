@@ -285,17 +285,22 @@ function PhraseIcon({ paths }) {
 }
 
 // Verbatim copy with an inline white icon dropped in right after each keyed phrase.
+// The comma that would trail the icon is dropped so it doesn't float after the glyph.
 function CopyWithIcons({ text }) {
   const parts = text.split(/(child welfare|group homes|elder care)/i);
   return parts.map((part, i) => {
     const icon = PHRASE_ICONS[part.toLowerCase()];
-    if (!icon) return <span key={i}>{part}</span>;
-    return (
-      <span key={i} style={{ whiteSpace: "nowrap" }}>
-        {part}
-        <PhraseIcon paths={icon} />
-      </span>
-    );
+    if (icon) {
+      return (
+        <span key={i} style={{ whiteSpace: "nowrap" }}>
+          {part}
+          <PhraseIcon paths={icon} />
+        </span>
+      );
+    }
+    const prev = parts[i - 1];
+    const txt = prev && PHRASE_ICONS[prev.toLowerCase()] ? part.replace(/^\s*,\s*/, " ") : part;
+    return <span key={i}>{txt}</span>;
   });
 }
 
