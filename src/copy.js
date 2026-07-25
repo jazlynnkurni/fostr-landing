@@ -28,8 +28,8 @@ export const PANELS = [
 export const BUSINESS_LINE = "PILOTING WITH CHILD-WELFARE AGENCIES IN MASSACHUSETTS";
 
 // Contact / booking. TODO: swap in Jaden's real Cal.com link + contact email.
-export const CAL_URL = "https://cal.com/jaden";
-export const CONTACT_EMAIL = "hello@fostr.co";
+export const CAL_URL = "https://cal.com/jaden"; // TODO: replace with Jaden's real Cal.com link
+export const CONTACT_EMAIL = "jaden@hireu.app";
 
 // Hardcoded for now; later dynamic. Grounded in the founder copy, no new claims.
 export const FAQS = [
