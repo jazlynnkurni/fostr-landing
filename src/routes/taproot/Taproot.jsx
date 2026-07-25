@@ -23,6 +23,7 @@ const overlayCard = {
   opacity: 0,
   background: "rgba(255,255,255,0.85)",
   border: "1px solid rgba(30,38,36,0.12)",
+  borderLeft: "3px solid var(--teal)", // turquoise accent bar on every card
   borderRadius: 10,
   padding: "12px 14px",
   color: "var(--ink)",
@@ -774,8 +775,6 @@ function ScrollTaproot() {
             ...overlayCard,
             width: "min(400px, 45vw)",
             background: "rgba(255,255,255,0.92)",
-            borderLeft: "2px solid var(--teal)",
-            borderRadius: "6px 10px 10px 6px",
             padding: "12px 16px",
           }}
         >
