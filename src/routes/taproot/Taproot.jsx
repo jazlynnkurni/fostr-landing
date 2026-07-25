@@ -550,6 +550,64 @@ function Paperfall() {
   return <canvas ref={ref} aria-hidden style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />;
 }
 
+// Founder image that assembles pixel by pixel as you scroll to the end: each grid
+// cell of the photo appears once the scroll reveal passes its per-cell threshold, so
+// the picture materialises from scattered pixels into the whole thing.
+function PixelImage({ src, progress, range, label }) {
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const wrap = wrapRef.current, canvas = canvasRef.current;
+    if (!wrap || !canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const img = new Image();
+    let loaded = false, iw = 1, ih = 1, W = 0, H = 0, raf = 0, lastR = -2;
+    function resize() {
+      const r = wrap.getBoundingClientRect();
+      W = r.width; H = loaded ? W * (ih / iw) : W * 0.528;
+      wrap.style.height = H + "px";
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + "px"; canvas.style.height = H + "px";
+      lastR = -2;
+    }
+    img.onload = () => { loaded = true; iw = img.width; ih = img.height; resize(); };
+    img.src = src;
+    resize();
+    const ro = new ResizeObserver(resize); ro.observe(wrap);
+    function draw(reveal) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      if (!loaded) return;
+      if (reveal >= 0.999) { ctx.drawImage(img, 0, 0, W, H); return; }
+      const cell = Math.max(8, W / 100);
+      const cols = Math.ceil(W / cell), rows = Math.ceil(H / cell);
+      const sxc = iw / cols, syc = ih / rows;
+      for (let cy = 0; cy < rows; cy++) {
+        for (let cx = 0; cx < cols; cx++) {
+          if (pf(cx * 12.3 + cy * 7.13 + 0.5) > reveal) continue;
+          ctx.drawImage(img, cx * sxc, cy * syc, sxc, syc, cx * cell, cy * cell, cell + 0.7, cell + 0.7);
+        }
+      }
+    }
+    function loop() {
+      raf = requestAnimationFrame(loop);
+      const p = progress.get();
+      const reveal = Math.min(1, Math.max(0, (p - range[0]) / (range[1] - range[0])));
+      if (Math.abs(reveal - lastR) < 0.004 && !(reveal >= 0.999 && lastR < 0.999)) return;
+      lastR = reveal;
+      draw(reveal);
+    }
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, [src, progress, range]);
+  return (
+    <div ref={wrapRef} role="img" aria-label={label} style={{ position: "relative", width: "100%" }}>
+      <canvas ref={canvasRef} style={{ display: "block", width: "100%", borderRadius: 16, boxShadow: "0 20px 64px rgba(23,58,57,0.20)" }} />
+    </div>
+  );
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -679,22 +737,20 @@ function ScrollTaproot() {
       <Panel i={5} progress={scrollYProgress}>
         <div style={{ textAlign: "center" }}>
           <H style={{ maxWidth: "30ch" }}><CopyWithIcons text={PANELS[5].text} /></H>
-          <div style={{ marginTop: 40 }}>
-            <div aria-hidden style={{ width: 1, height: 34, background: "rgba(30,38,36,0.3)", margin: "0 auto 14px" }} />
-            <div style={{ ...mono, fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(30,38,36,0.65)" }}>
-              {BUSINESS_LINE}
-            </div>
-          </div>
         </div>
       </Panel>
 
-      {/* 7 — the founder: Jaden, in his own words + portrait */}
+      {/* 7 — the founder: Jaden, in his own words + portrait (assembles pixel by pixel) */}
       <Panel i={6} progress={scrollYProgress} color="var(--ink)">
         <div style={{ maxWidth: "min(1000px, 92vw)", margin: "0 auto" }}>
-          <img
+          <div style={{ ...mono, textAlign: "center", fontSize: 12, letterSpacing: "0.28em", textTransform: "uppercase", color: "rgba(30,38,36,0.6)", marginBottom: 22 }}>
+            {BUSINESS_LINE}
+          </div>
+          <PixelImage
             src="/jaden.png"
-            alt={`${PANELS[6].attribution}: ${PANELS[6].text}`}
-            style={{ width: "100%", height: "auto", display: "block", borderRadius: 16, boxShadow: "0 20px 64px rgba(23,58,57,0.20)" }}
+            progress={scrollYProgress}
+            range={[PB[6] + 0.02, PB[6] + 0.07]}
+            label={`${PANELS[6].attribution}: ${PANELS[6].text}`}
           />
         </div>
       </Panel>
