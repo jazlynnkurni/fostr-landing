@@ -524,7 +524,8 @@ function World({ progress, bridge }) {
           e,
         ])
     );
-    const geoms = curves.map((c) => new THREE.TubeGeometry(c, 48, 0.065, 6, false));
+    // taper each filament to a sharp point at its tip (thick at the node -> ~0 at the end)
+    const geoms = curves.map((c) => taperTube(c, 48, 6, (u) => 0.08 * Math.pow(1 - u, 1.5) + 0.003));
     // The panel-5 trace path: court-prep endpoint -> back up its filament -> up the taproot.
     const fNode = fractionAtY(lut, node.y + 0.02);
     const fSrc = fractionAtY(lut, -9.0);
@@ -548,7 +549,7 @@ function World({ progress, bridge }) {
           new THREE.Vector3(s * 2.2, latNode.y - 0.5, -0.4),
           new THREE.Vector3(s * 6.5, latNode.y - 1.3, -0.9),
         ]);
-        return new THREE.TubeGeometry(c, 40, 0.055, 6, false);
+        return taperTube(c, 40, 6, (u) => 0.07 * Math.pow(1 - u, 1.5) + 0.003);
       }),
     [latNode]
   );
@@ -559,7 +560,7 @@ function World({ progress, bridge }) {
       new THREE.Vector3(seed.x - 0.18, seed.y + 1.1, 0.1),
       new THREE.Vector3(seed.x + 0.05, seed.y + 2.4, 0.0),
     ]);
-    return new THREE.TubeGeometry(c, 40, 0.05, 6, false);
+    return taperTube(c, 40, 6, (u) => 0.055 * Math.pow(1 - u, 1.4) + 0.003);
   }, [seed]);
 
   // Soil: one big vertex-colored gradient wall behind the root.

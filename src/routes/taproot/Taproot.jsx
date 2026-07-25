@@ -438,8 +438,14 @@ function CursorMosaic() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const hex = (getComputedStyle(document.documentElement).getPropertyValue("--teal").trim() || "#5DA1A1").match(/[0-9a-f]{2}/gi) || ["5d", "a1", "a1"];
-    const m = hex.map((h) => parseInt(h, 16));
+    // multi-colour palette: turquoise family + meadow gold, for depth + fusion
+    const PAL = [
+      [111, 206, 204, 0.7],  // #6FCECC turquoise
+      [93, 161, 161, 0.72],  // #5DA1A1 teal
+      [42, 122, 120, 0.62],  // #2A7A78 deep teal
+      [169, 218, 216, 0.6],  // light turquoise
+      [225, 199, 142, 0.72], // #E1C78E meadow gold
+    ];
     const CELL = 15;
     const cells = new Map();
     let mx = -1e4, my = -1e4, has = false, raf = 0;
@@ -450,6 +456,7 @@ function CursorMosaic() {
     window.addEventListener("pointermove", move, { passive: true });
     let seed = 1;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const pick = () => { const r = rnd(); return r < 0.22 ? PAL[4] : r < 0.44 ? PAL[1] : r < 0.6 ? PAL[2] : r < 0.8 ? PAL[3] : PAL[0]; };
     function loop() {
       raf = requestAnimationFrame(loop);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -460,7 +467,7 @@ function CursorMosaic() {
           const d = Math.hypot(dx, dy);
           if (d > 2.4) continue;
           const key = (gx + dx) + "," + (gy + dy);
-          const c = cells.get(key) || { x: gx + dx, y: gy + dy, v: 0 };
+          const c = cells.get(key) || { x: gx + dx, y: gy + dy, v: 0, col: pick() };
           c.v = Math.min(1, c.v + (1 - d / 2.6) * (0.4 + rnd() * 0.6) * 0.6);
           cells.set(key, c);
         }
@@ -468,7 +475,8 @@ function CursorMosaic() {
       cells.forEach((c, key) => {
         c.v *= 0.9;
         if (c.v < 0.03) { cells.delete(key); return; }
-        ctx.fillStyle = `rgba(${m[0]},${m[1]},${m[2]},${(c.v * 0.68).toFixed(3)})`;
+        const col = c.col;
+        ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${(c.v * col[3]).toFixed(3)})`;
         ctx.fillRect(c.x * CELL, c.y * CELL, CELL - 1, CELL - 1);
       });
     }
@@ -580,36 +588,83 @@ function PixelImage({ src, progress, range, label }) {
     img.src = src;
     resize();
     const ro = new ResizeObserver(resize); ro.observe(wrap);
-    function draw(reveal) {
+    // hover ripple: rings of tiles lift and revert as they pass under the cursor
+    let hover = false, mx = 0, my = 0, t0 = performance.now();
+    const move = (e) => { const r = canvas.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; hover = true; };
+    const leave = () => { hover = false; };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerleave", leave);
+    function draw(reveal, t) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       if (!loaded) return;
-      if (reveal >= 0.999) { ctx.drawImage(img, 0, 0, W, H); return; }
+      const rippling = hover && reveal >= 0.999;
+      if (reveal >= 0.999 && !rippling) { ctx.drawImage(img, 0, 0, W, H); return; }
       const cell = Math.max(8, W / 100);
       const cols = Math.ceil(W / cell), rows = Math.ceil(H / cell);
       const sxc = iw / cols, syc = ih / rows;
+      const R = 240;
       for (let cy = 0; cy < rows; cy++) {
         for (let cx = 0; cx < cols; cx++) {
-          if (pf(cx * 12.3 + cy * 7.13 + 0.5) > reveal) continue;
-          ctx.drawImage(img, cx * sxc, cy * syc, sxc, syc, cx * cell, cy * cell, cell + 0.7, cell + 0.7);
+          if (reveal < 0.999 && pf(cx * 12.3 + cy * 7.13 + 0.5) > reveal) continue;
+          let px = cx * cell, py = cy * cell, sz = cell + 0.7;
+          if (rippling) {
+            const ccx = px + cell / 2, ccy = py + cell / 2;
+            const dd = Math.hypot(ccx - mx, ccy - my);
+            const fall = Math.max(0, 1 - dd / R);
+            if (fall > 0) {
+              const wave = Math.sin(dd * 0.07 - t * 8) * fall;
+              if (wave > 0.72) continue; // crest of the wave: this tile reverts (gap)
+              const disp = wave * 12;
+              px += ((ccx - mx) / (dd || 1)) * disp;
+              py += ((ccy - my) / (dd || 1)) * disp;
+              sz += Math.abs(wave) * 1.5;
+            }
+          }
+          ctx.drawImage(img, cx * sxc, cy * syc, sxc, syc, px, py, sz, sz);
         }
       }
     }
-    function loop() {
+    function loop(now) {
       raf = requestAnimationFrame(loop);
       const p = progress.get();
       const reveal = Math.min(1, Math.max(0, (p - range[0]) / (range[1] - range[0])));
-      if (Math.abs(reveal - lastR) < 0.004 && !(reveal >= 0.999 && lastR < 0.999)) return;
+      const changed = Math.abs(reveal - lastR) >= 0.004 || (reveal >= 0.999 && lastR < 0.999);
+      if (!changed && !hover) return; // redraw on reveal change or while hovering (ripple)
       lastR = reveal;
-      draw(reveal);
+      draw(reveal, (now - t0) / 1000);
     }
     raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerleave", leave); };
   }, [src, progress, range]);
   return (
     <div ref={wrapRef} role="img" aria-label={label} style={{ position: "relative", width: "100%" }}>
       <canvas ref={canvasRef} style={{ display: "block", width: "100%", borderRadius: 16, boxShadow: "0 20px 64px rgba(23,58,57,0.20)" }} />
     </div>
+  );
+}
+
+// FAQ capsule: 2px turquoise outline + white inner; fills turquoise (white text) on
+// hover/press.
+function FaqButton() {
+  const [on, setOn] = useState(false);
+  return (
+    <a
+      href="/faq"
+      onMouseEnter={() => setOn(true)}
+      onMouseLeave={() => setOn(false)}
+      onMouseDown={() => setOn(true)}
+      onFocus={() => setOn(true)}
+      onBlur={() => setOn(false)}
+      style={{
+        display: "inline-block", textDecoration: "none", fontSize: 14, fontWeight: 700,
+        letterSpacing: "0.02em", padding: "9px 22px", borderRadius: 999,
+        border: "2px solid var(--teal)", background: on ? "var(--teal)" : "#ffffff",
+        color: on ? "#ffffff" : "var(--ink)", transition: "background .18s ease, color .18s ease",
+      }}
+    >
+      FAQ
+    </a>
   );
 }
 
@@ -692,10 +747,9 @@ function ScrollTaproot() {
         <Logo height={26} />
       </motion.header>
 
-      {/* persistent nav: FAQ + book with Jaden */}
-      <nav style={{ position: "fixed", top: 16, right: 20, zIndex: 7, display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-inter)" }}>
-        <a href="/faq" style={{ color: "var(--ink)", textDecoration: "none", fontSize: 14, fontWeight: 500, padding: "9px 14px", borderRadius: 999 }}>FAQ</a>
-        <a href={CAL_URL} target="_blank" rel="noopener noreferrer" style={{ background: "var(--teal)", color: "#08201f", textDecoration: "none", fontSize: 14, fontWeight: 700, padding: "9px 16px", borderRadius: 999 }}>Book with Jaden</a>
+      {/* persistent nav: FAQ capsule (outline -> fills turquoise on hover/press) */}
+      <nav style={{ position: "fixed", top: 16, right: 20, zIndex: 7, fontFamily: "var(--font-inter)" }}>
+        <FaqButton />
       </nav>
 
       {/* 1 — HERO, above ground */}
