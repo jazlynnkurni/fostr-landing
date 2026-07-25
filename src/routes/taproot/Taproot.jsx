@@ -488,10 +488,10 @@ function Paperfall() {
     const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
     function build() {
       sheets = [];
-      const n = Math.round((W * H) / 46000);
+      const n = Math.round((W * H) / 32000);
       for (let i = 0; i < n; i++) {
-        const w = 34 + rnd() * 34;
-        sheets.push({ x: rnd() * W, y: rnd() * H, w, h: w * (0.66 + rnd() * 0.12), vy: 10 + rnd() * 26, rot: (rnd() - 0.5) * 0.5, vr: (rnd() - 0.5) * 0.2, a: 0.05 + rnd() * 0.1 });
+        const w = 38 + rnd() * 40;
+        sheets.push({ x: rnd() * W, y: rnd() * H, w, h: w * (0.66 + rnd() * 0.12), vy: 12 + rnd() * 30, rot: (rnd() - 0.5) * 0.5, vr: (rnd() - 0.5) * 0.2, a: 0.16 + rnd() * 0.22 });
       }
     }
     function resize() { const r = canvas.getBoundingClientRect(); W = r.width; H = r.height; canvas.width = W * dpr; canvas.height = H * dpr; build(); }
