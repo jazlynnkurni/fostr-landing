@@ -472,6 +472,75 @@ function CursorMosaic() {
   return <canvas ref={ref} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 8, pointerEvents: "none", mixBlendMode: "multiply" }} />;
 }
 
+// Panel-3 backdrop ("Not the worker's fault... no one chose this for love of
+// paperwork"): an endless, faint drift of little form-cards falling behind the text —
+// the paperwork that never stops, and drifting away from the cursor if you brush it.
+function Paperfall() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, raf = 0, sheets = [];
+    const mouse = { x: -1e4, y: -1e4 };
+    let s = 12345;
+    const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    function build() {
+      sheets = [];
+      const n = Math.round((W * H) / 46000);
+      for (let i = 0; i < n; i++) {
+        const w = 34 + rnd() * 34;
+        sheets.push({ x: rnd() * W, y: rnd() * H, w, h: w * (0.66 + rnd() * 0.12), vy: 10 + rnd() * 26, rot: (rnd() - 0.5) * 0.5, vr: (rnd() - 0.5) * 0.2, a: 0.05 + rnd() * 0.1 });
+      }
+    }
+    function resize() { const r = canvas.getBoundingClientRect(); W = r.width; H = r.height; canvas.width = W * dpr; canvas.height = H * dpr; build(); }
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    const move = (e) => { const r = canvas.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; };
+    window.addEventListener("pointermove", move, { passive: true });
+    let last = performance.now();
+    function loop(now) {
+      raf = requestAnimationFrame(loop);
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      for (const p of sheets) {
+        p.y += p.vy * dt;
+        p.rot += p.vr * dt;
+        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+        if (d < 130) { p.x += (dx / (d || 1)) * (1 - d / 130) * 2.4; }
+        if (p.y - p.h > H) { p.y = -p.h; p.x = rnd() * W; }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.globalAlpha = p.a;
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "rgba(46,110,109,0.55)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(-p.w / 2, -p.h / 2, p.w, p.h, 3);
+        else ctx.rect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(30,38,36,0.3)";
+        for (let i = 0; i < 3; i++) {
+          const yy = -p.h / 2 + p.h * 0.28 + i * (p.h * 0.2);
+          ctx.beginPath();
+          ctx.moveTo(-p.w / 2 + 5, yy);
+          ctx.lineTo(p.w / 2 - 5 - (i === 2 ? p.w * 0.28 : 0), yy);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+    raf = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); window.removeEventListener("pointermove", move); };
+  }, []);
+  return <canvas ref={ref} aria-hidden style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />;
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -580,8 +649,8 @@ function ScrollTaproot() {
         <H style={{ maxWidth: "26ch", textAlign: "center" }}>{PANELS[1].text}</H>
       </Panel>
 
-      {/* 3 — stillness. The root pauses mid-growth. */}
-      <Panel i={2} progress={scrollYProgress}>
+      {/* 3 — not the worker's fault: paperwork falls endlessly behind the words */}
+      <Panel i={2} progress={scrollYProgress} backdrop={<Paperfall />}>
         <H style={{ maxWidth: "22ch", textAlign: "center" }}>{PANELS[2].text}</H>
       </Panel>
 
