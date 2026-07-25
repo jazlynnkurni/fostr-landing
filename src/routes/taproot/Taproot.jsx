@@ -609,8 +609,13 @@ function PixelImage({ src, progress, range, label }) {
     function loop() {
       raf = requestAnimationFrame(loop);
       const p = progress.get();
-      const reveal = Math.min(1, Math.max(0, (p - range[0]) / (range[1] - range[0])));
-      if (Math.abs(reveal - lastR) < 0.004 && !(reveal >= 0.999 && lastR < 0.999)) return;
+      // assemble on the way in (range[0..1]), disassemble back into pixels on the way
+      // out (range[2..3]) so it lands AND leaves through the same pixel effect.
+      const enter = (p - range[0]) / (range[1] - range[0]);
+      const exit = (p - range[2]) / (range[3] - range[2]);
+      const reveal = Math.min(1, Math.max(0, Math.min(enter, 1 - exit)));
+      const crossFull = (reveal >= 0.999) !== (lastR >= 0.999);
+      if (Math.abs(reveal - lastR) < 0.004 && !crossFull) return;
       lastR = reveal;
       draw(reveal);
     }
@@ -621,6 +626,33 @@ function PixelImage({ src, progress, range, label }) {
     <div ref={wrapRef} role="img" aria-label={label} style={{ position: "relative", width: "100%" }}>
       <canvas ref={canvasRef} style={{ display: "block", width: "100%", borderRadius: 16, boxShadow: "0 20px 64px rgba(23,58,57,0.20)" }} />
     </div>
+  );
+}
+
+// Frosted-glass CTA: transparent (blurred) with a hairline border; fills turquoise
+// with white text on hover.
+function GlassButton({ href, external, children }) {
+  const [h, setH] = useState(false);
+  return (
+    <a
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      onFocus={() => setH(true)}
+      onBlur={() => setH(false)}
+      style={{
+        display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
+        padding: "14px 26px", borderRadius: 999,
+        background: h ? "var(--teal)" : "rgba(255,255,255,0.14)",
+        border: `1px solid ${h ? "var(--teal)" : "rgba(30,38,36,0.28)"}`,
+        color: h ? "#ffffff" : "var(--ink)",
+        backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+        transition: "background .18s ease, color .18s ease, border-color .18s ease",
+      }}
+    >
+      {children}
+    </a>
   );
 }
 
@@ -786,16 +818,12 @@ function ScrollTaproot() {
           <PixelImage
             src="/jaden.png"
             progress={scrollYProgress}
-            range={[PB[6] + 0.02, PB[6] + 0.07]}
+            range={[PB[6] + 0.02, PB[6] + 0.07, PB[7] - 0.05, PB[7] - 0.012]}
             label={`${PANELS[6].attribution}: ${PANELS[6].text}`}
           />
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
-            <a href={CAL_URL} target="_blank" rel="noopener noreferrer" style={{ background: "var(--teal)", color: "#0F1B1A", fontWeight: 700, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}>
-              {PANELS[7].text}
-            </a>
-            <a href={`mailto:${CONTACT_EMAIL}`} style={{ border: "1px solid rgba(30,38,36,0.35)", color: "var(--ink)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}>
-              {PANELS[7].secondary}
-            </a>
+            <GlassButton href={CAL_URL} external>{PANELS[7].text}</GlassButton>
+            <GlassButton href={`mailto:${CONTACT_EMAIL}`}>{PANELS[7].secondary}</GlassButton>
           </div>
         </div>
       </Panel>
