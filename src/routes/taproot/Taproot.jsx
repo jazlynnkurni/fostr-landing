@@ -448,12 +448,15 @@ function CursorMosaic() {
     ];
     const CELL = 15;
     const cells = new Map();
-    let mx = -1e4, my = -1e4, has = false, raf = 0;
+    let mx = -1e4, my = -1e4, has = false, raf = 0, sf = 1;
     const move = (e) => { mx = e.clientX; my = e.clientY; has = true; };
     const resize = () => { canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr; canvas.style.width = window.innerWidth + "px"; canvas.style.height = window.innerHeight + "px"; };
-    resize();
+    // only lives in the hero: fade the whole trail out as you scroll past the first screen
+    const onScroll = () => { const f = window.scrollY / Math.max(1, window.innerHeight); sf = 1 - Math.min(1, Math.max(0, (f - 0.25) / 0.5)); };
+    resize(); onScroll();
     window.addEventListener("resize", resize);
     window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     let seed = 1;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     const pick = () => { const r = rnd(); return r < 0.22 ? PAL[4] : r < 0.44 ? PAL[1] : r < 0.6 ? PAL[2] : r < 0.8 ? PAL[3] : PAL[0]; };
@@ -461,7 +464,7 @@ function CursorMosaic() {
       raf = requestAnimationFrame(loop);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      if (has) {
+      if (has && sf > 0.01) {
         const gx = Math.floor(mx / CELL), gy = Math.floor(my / CELL);
         for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
           const d = Math.hypot(dx, dy);
@@ -476,12 +479,12 @@ function CursorMosaic() {
         c.v *= 0.9;
         if (c.v < 0.03) { cells.delete(key); return; }
         const col = c.col;
-        ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${(c.v * col[3]).toFixed(3)})`;
+        ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${(c.v * col[3] * sf).toFixed(3)})`;
         ctx.fillRect(c.x * CELL, c.y * CELL, CELL - 1, CELL - 1);
       });
     }
     raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); window.removeEventListener("pointermove", move); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); window.removeEventListener("pointermove", move); window.removeEventListener("scroll", onScroll); };
   }, []);
   return <canvas ref={ref} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 8, pointerEvents: "none", mixBlendMode: "multiply" }} />;
 }
