@@ -624,8 +624,7 @@ function PixelImage({ src, progress, range, label }) {
   );
 }
 
-// FAQ capsule: 2px turquoise outline + white inner; fills turquoise (white text) on
-// hover/press.
+// FAQ: plain text link; the text turns white on hover/press.
 function FaqButton() {
   const [on, setOn] = useState(false);
   return (
@@ -637,10 +636,9 @@ function FaqButton() {
       onFocus={() => setOn(true)}
       onBlur={() => setOn(false)}
       style={{
-        display: "inline-block", textDecoration: "none", fontSize: 14, fontWeight: 700,
-        letterSpacing: "0.02em", padding: "9px 22px", borderRadius: 999,
-        border: "2px solid var(--teal)", background: on ? "var(--teal)" : "#ffffff",
-        color: on ? "#ffffff" : "var(--ink)", transition: "background .18s ease, color .18s ease",
+        display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
+        letterSpacing: "0.02em", padding: "8px 6px", background: "none", border: "none",
+        color: on ? "#ffffff" : "var(--ink)", transition: "color .15s ease",
       }}
     >
       FAQ

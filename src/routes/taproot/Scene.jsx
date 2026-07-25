@@ -447,7 +447,8 @@ function World({ progress, bridge }) {
 
   const rootGeom = useMemo(
     () =>
-      taperTube(mainCurve, 360, 8, () => 0.1), // thin root pipeline hanging from the soil block
+      // constant river that tapers to a SHARP point at its deep end (the seed)
+      taperTube(mainCurve, 360, 8, (u) => (u < 0.9 ? 0.1 : 0.1 * (1 - (u - 0.9) / 0.1))),
     [mainCurve]
   );
 
