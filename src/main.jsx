@@ -2,20 +2,14 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
-import Home from "./pages/Home.jsx";
 import Taproot from "./routes/taproot/Taproot.jsx";
-import Record from "./routes/record/Record.jsx";
-import Survey from "./routes/survey/Survey.jsx";
-import Worklight from "./routes/worklight/Worklight.jsx";
 import Faq from "./pages/Faq.jsx";
 
+// We've committed to the taproot concept — it's the site. Only two routes remain:
+// the story itself and the FAQ. (Old concept-picker + alternate directions removed.)
 const router = createBrowserRouter([
   { path: "/", element: <Taproot /> },
   { path: "/taproot", element: <Taproot /> },
-  { path: "/concepts", element: <Home /> },
-  { path: "/record", element: <Record /> },
-  { path: "/survey", element: <Survey /> },
-  { path: "/worklight", element: <Worklight /> },
   { path: "/faq", element: <Faq /> },
 ]);
 ReactDOM.createRoot(document.getElementById("root")).render(
