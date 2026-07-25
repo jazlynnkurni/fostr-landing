@@ -814,13 +814,21 @@ function ScrollTaproot() {
             range={[PB[6] + 0.02, PB[6] + 0.07]}
             label={`${PANELS[6].attribution}: ${PANELS[6].text}`}
           />
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
+            <a href={CAL_URL} target="_blank" rel="noopener noreferrer" style={{ background: "var(--teal)", color: "#0F1B1A", fontWeight: 700, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}>
+              {PANELS[7].text}
+            </a>
+            <a href={`mailto:${CONTACT_EMAIL}`} style={{ border: "1px solid rgba(30,38,36,0.35)", color: "var(--ink)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}>
+              {PANELS[7].secondary}
+            </a>
+          </div>
         </div>
       </Panel>
 
-      {/* 8 — germination: the shoot resolves into the sprout, CTA on warm ground */}
+      {/* 8 — germination: the shoot resolves into the two-leaf sprout, a quiet close */}
       <Panel i={7} progress={scrollYProgress}>
         <div style={{ textAlign: "center" }}>
-          <svg viewBox="112 122 32 20" width="64" aria-hidden style={{ overflow: "visible", display: "inline-block", marginBottom: 30 }}>
+          <svg viewBox="112 122 32 20" width="72" aria-hidden style={{ overflow: "visible", display: "inline-block" }}>
             <motion.path
               d="M128.571 140V131.952C127.175 129.999 121.029 125.903 116 127.619"
               stroke="var(--teal)"
@@ -836,22 +844,6 @@ function ScrollTaproot() {
               style={{ pathLength: leaf2 }}
             />
           </svg>
-          <motion.div style={{ opacity: ctaO, y: ctaY, display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <a
-              href={CAL_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ background: "var(--teal)", color: "#0F1B1A", fontWeight: 700, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
-            >
-              {PANELS[7].text}
-            </a>
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              style={{ border: "1px solid rgba(30,38,36,0.35)", color: "var(--ink)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
-            >
-              {PANELS[7].secondary}
-            </a>
-          </motion.div>
         </div>
       </Panel>
 
