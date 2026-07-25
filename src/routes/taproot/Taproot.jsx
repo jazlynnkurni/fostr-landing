@@ -431,7 +431,7 @@ function ColorTuner({ bridge }) {
 
 // Site-wide cursor mosaic: a pixelated turquoise trail that lights the grid cells the
 // cursor passes and fades them out — the old thermal-pixel cursor, back.
-function CursorMosaic() {
+function CursorMosaic({ hideRef }) {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -464,6 +464,7 @@ function CursorMosaic() {
       raf = requestAnimationFrame(loop);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      if (hideRef && hideRef.current) { cells.clear(); return; } // vanish while over the FAQ button
       if (has && sf > 0.01) {
         const gx = Math.floor(mx / CELL), gy = Math.floor(my / CELL);
         for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
@@ -656,21 +657,25 @@ function GlassButton({ href, external, children }) {
   );
 }
 
-// FAQ: plain text link; the text turns white on hover/press.
-function FaqButton() {
+// FAQ: plain text that becomes a frosted-glass capsule on hover. While hovered it
+// also tells the cursor mosaic to vanish (via hoverRef).
+function FaqButton({ hoverRef }) {
   const [on, setOn] = useState(false);
+  const set = (v) => { setOn(v); if (hoverRef) hoverRef.current = v; };
   return (
     <a
       href="/faq"
-      onMouseEnter={() => setOn(true)}
-      onMouseLeave={() => setOn(false)}
-      onMouseDown={() => setOn(true)}
-      onFocus={() => setOn(true)}
-      onBlur={() => setOn(false)}
+      onMouseEnter={() => set(true)}
+      onMouseLeave={() => set(false)}
+      onFocus={() => set(true)}
+      onBlur={() => set(false)}
       style={{
         display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
-        letterSpacing: "0.02em", padding: "8px 6px", background: "none", border: "none",
-        color: on ? "#ffffff" : "var(--ink)", transition: "color .15s ease",
+        letterSpacing: "0.02em", padding: "9px 20px", borderRadius: 999,
+        background: on ? "rgba(255,255,255,0.16)" : "transparent",
+        border: `1px solid ${on ? "rgba(30,38,36,0.22)" : "transparent"}`,
+        backdropFilter: on ? "blur(8px)" : "none", WebkitBackdropFilter: on ? "blur(8px)" : "none",
+        color: "var(--ink)", transition: "background .18s ease, border-color .18s ease",
       }}
     >
       FAQ
@@ -687,6 +692,7 @@ function ScrollTaproot() {
     els: { pill: null, cards: [null, null, null, null], filing: null, filingLine: null, source: null },
   });
   const lenisRef = useRef(null);
+  const faqHover = useRef(false); // true while the FAQ button is hovered (hides the mosaic)
   const { scrollYProgress } = useScroll();
 
   useEffect(() => {
@@ -735,7 +741,7 @@ function ScrollTaproot() {
         </Suspense>
       </div>
 
-      <CursorMosaic />
+      <CursorMosaic hideRef={faqHover} />
       <ColorTuner bridge={bridge} />
 
       {/* warm ground for germination */}
@@ -759,7 +765,7 @@ function ScrollTaproot() {
 
       {/* persistent nav: FAQ capsule (outline -> fills turquoise on hover/press) */}
       <nav style={{ position: "fixed", top: 16, right: 20, zIndex: 7, fontFamily: "var(--font-inter)" }}>
-        <FaqButton />
+        <FaqButton hoverRef={faqHover} />
       </nav>
 
       {/* 1 — HERO, above ground */}

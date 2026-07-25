@@ -72,6 +72,33 @@ function Item({ q, a, open, onToggle }) {
   );
 }
 
+// Frosted-glass button: transparent + blur + hairline border; fills turquoise (white
+// text) on hover.
+function GlassBtn({ href, external, children }) {
+  const [h, setH] = useState(false);
+  return (
+    <a
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      onFocus={() => setH(true)}
+      onBlur={() => setH(false)}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none",
+        borderRadius: 999, fontFamily: "var(--font-inter)", fontWeight: 600, fontSize: 15, padding: "13px 24px",
+        background: h ? "var(--teal)" : "rgba(255,255,255,0.14)",
+        border: `1px solid ${h ? "var(--teal)" : "rgba(30,38,36,0.24)"}`,
+        color: h ? "#ffffff" : "var(--ink)",
+        backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+        transition: "background .18s ease, color .18s ease, border-color .18s ease",
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 export default function Faq() {
   const [open, setOpen] = useState(0);
   const btn = { display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", borderRadius: 999, fontFamily: "var(--font-inter)", fontWeight: 600, fontSize: 15, padding: "13px 24px" };
@@ -81,8 +108,7 @@ export default function Faq() {
       <header style={{ position: "sticky", top: 0, zIndex: 10, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px clamp(20px, 5vw, 56px)", background: "rgba(247,245,241,0.82)", backdropFilter: "blur(10px)", borderBottom: "1px solid rgba(30,38,36,0.08)" }}>
         <a href="/taproot" aria-label="Fostr home" style={{ color: "var(--ink)", textDecoration: "none" }}><Logo height={24} /></a>
         <nav style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <a href="/taproot" style={{ ...btn, padding: "10px 16px", color: "var(--ink)" }}>The story</a>
-          <a href={CAL_URL} target="_blank" rel="noopener noreferrer" style={{ ...btn, padding: "10px 18px", background: "var(--teal)", color: "#08201f", fontWeight: 700 }}>Book with Jaden</a>
+          <GlassBtn href={CAL_URL} external>Book with Jaden</GlassBtn>
         </nav>
       </header>
 
@@ -113,8 +139,8 @@ export default function Faq() {
             Book 20 minutes with Jaden for a walkthrough, or send a note. Real conversations, no sales script.
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <a href={CAL_URL} target="_blank" rel="noopener noreferrer" style={{ ...btn, background: "var(--teal)", color: "#08201f", fontWeight: 700 }}>Book with Jaden</a>
-            <a href={`mailto:${CONTACT_EMAIL}`} style={{ ...btn, border: "1px solid rgba(30,38,36,0.35)", color: "var(--ink)" }}>Email us</a>
+            <GlassBtn href={CAL_URL} external>Book with Jaden</GlassBtn>
+            <GlassBtn href={`mailto:${CONTACT_EMAIL}`}>Email us</GlassBtn>
           </div>
         </div>
       </section>
