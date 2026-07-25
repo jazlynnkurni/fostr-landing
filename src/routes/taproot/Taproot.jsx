@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from "lenis";
 import Logo from "../../components/Logo.jsx";
-import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE } from "../../copy.js";
+import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE, CAL_URL, CONTACT_EMAIL } from "../../copy.js";
 import { SECTION_VHS, PB } from "./journey.js";
 import StaticTaproot from "./StaticTaproot.jsx";
 
@@ -551,6 +551,12 @@ function ScrollTaproot() {
         <Logo height={26} />
       </motion.header>
 
+      {/* persistent nav: FAQ + book with Jaden */}
+      <nav style={{ position: "fixed", top: 16, right: 20, zIndex: 7, display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-inter)" }}>
+        <a href="/faq" style={{ color: "var(--ink)", textDecoration: "none", fontSize: 14, fontWeight: 500, padding: "9px 14px", borderRadius: 999 }}>FAQ</a>
+        <a href={CAL_URL} target="_blank" rel="noopener noreferrer" style={{ background: "var(--teal)", color: "#08201f", textDecoration: "none", fontSize: 14, fontWeight: 700, padding: "9px 16px", borderRadius: 999 }}>Book with Jaden</a>
+      </nav>
+
       {/* 1 — HERO, above ground */}
       <Panel
         i={0}
@@ -636,15 +642,15 @@ function ScrollTaproot() {
           </svg>
           <motion.div style={{ opacity: ctaO, y: ctaY, display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
+              href={CAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               style={{ background: "var(--teal)", color: "#0F1B1A", fontWeight: 700, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
             >
               {PANELS[7].text}
             </a>
             <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
+              href={`mailto:${CONTACT_EMAIL}`}
               style={{ border: "1px solid rgba(30,38,36,0.35)", color: "var(--ink)", fontWeight: 600, padding: "14px 26px", borderRadius: 999, textDecoration: "none", fontSize: 15 }}
             >
               {PANELS[7].secondary}

@@ -26,6 +26,26 @@ export const PANELS = [
     secondary: "Email Jaden" },
 ];
 export const BUSINESS_LINE = "PILOTING WITH CHILD-WELFARE AGENCIES IN MASSACHUSETTS";
+
+// Contact / booking. TODO: swap in Jaden's real Cal.com link + contact email.
+export const CAL_URL = "https://cal.com/jaden";
+export const CONTACT_EMAIL = "hello@fostr.co";
+
+// Hardcoded for now; later dynamic. Grounded in the founder copy, no new claims.
+export const FAQS = [
+  { q: "What does Fostr actually do?",
+    a: "A caseworker captures the information once, during the visit, and Fostr sends it everywhere it's owed: intake, case notes, court prep, and the state's system. The same facts, entered once instead of typed over and over." },
+  { q: "Is what it produces accurate enough for court?",
+    a: "Every line Fostr produces traces back to something in the record. Nothing is guessed or invented, so a filing is never \"mostly right.\"" },
+  { q: "Does it replace caseworkers?",
+    a: "No. Fostr takes the paperwork off their plate so more of their day can reach the people they're there for. The work, and the judgment, stays theirs." },
+  { q: "Who is it for right now?",
+    a: "We're starting with child welfare, alongside the people already doing the work. Group homes, elder care, and anywhere reporting is eating the job come next." },
+  { q: "Where are you piloting?",
+    a: "We're piloting with child-welfare agencies in Massachusetts." },
+  { q: "How do I see it in action?",
+    a: "Book 20 minutes with Jaden, the founder. He'll walk you through a real workflow and answer anything." },
+];
 export const DEMO_DOCS = ["Intake", "Case notes", "Court prep", "State system"];
 export const TRACE_EXAMPLE = {
   filingLine: "The child was present at the placement on March 14 and reported feeling safe.",
