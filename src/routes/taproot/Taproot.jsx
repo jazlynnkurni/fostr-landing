@@ -579,9 +579,14 @@ function Paperfall() {
 // Founder image that assembles pixel by pixel as you scroll to the end: each grid
 // cell of the photo appears once the scroll reveal passes its per-cell threshold, so
 // the picture materialises from scattered pixels into the whole thing.
-function PixelImage({ src, progress, range, label }) {
+function PixelImage({ src, progress, range, label, badge }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
+  // Track whether the photo is actually on screen (mid pixel-reveal) so the cursor-warp
+  // badge is only offered while there's a picture to hover — from appear to disappear.
+  const [visible, setVisible] = useState(false);
+  const visRef = useRef(false);
+  const warp = useCursorWarp(badge || "", !!badge && visible);
   useEffect(() => {
     const wrap = wrapRef.current, canvas = canvasRef.current;
     if (!wrap || !canvas) return;
@@ -624,6 +629,9 @@ function PixelImage({ src, progress, range, label }) {
       const enter = (p - range[0]) / (range[1] - range[0]);
       const exit = (p - range[2]) / (range[3] - range[2]);
       const reveal = Math.min(1, Math.max(0, Math.min(enter, 1 - exit)));
+      // available for the cursor-warp exactly across the visible window (appear→disappear)
+      const vis = reveal > 0.1;
+      if (vis !== visRef.current) { visRef.current = vis; setVisible(vis); }
       const crossFull = (reveal >= 0.999) !== (lastR >= 0.999);
       if (Math.abs(reveal - lastR) < 0.004 && !crossFull) return;
       lastR = reveal;
@@ -633,56 +641,47 @@ function PixelImage({ src, progress, range, label }) {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [src, progress, range]);
   return (
-    <div ref={wrapRef} role="img" aria-label={label} style={{ position: "relative", width: "100%" }}>
+    <div
+      ref={wrapRef}
+      role="img"
+      aria-label={label}
+      {...(badge ? warp.bind : {})}
+      style={{ position: "relative", width: "100%", cursor: warp.active ? "none" : "auto" }}
+    >
       <canvas ref={canvasRef} style={{ display: "block", width: "100%", borderRadius: 16, boxShadow: "0 20px 64px rgba(23,58,57,0.20)" }} />
+      {warp.overlay}
     </div>
   );
 }
 
 // Frosted-glass CTA: transparent (blurred) with a hairline border; fills turquoise
 // with white text on hover.
-function GlassButton({ href, external, children, badge }) {
+// Cursor-warp badge: while hovering an enabled target, the native cursor is hidden and
+// the credential pill warps in and rides the pointer (spring-trailed = the "warp").
+// `enabled` gates it — e.g. only while Jaden's photo is actually on screen. Returns
+// pointer handlers to spread, whether it's active, and the portal overlay to render.
+function useCursorWarp(label, enabled = true) {
   const [h, setH] = useState(false);
-  // Cursor-warp badge: while hovering, the native cursor is hidden and the credential
-  // pill lifts off the corner and rides the pointer (spring-trailed = the "warp").
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
   const sx = useSpring(mx, { stiffness: 380, damping: 26, mass: 0.55 });
   const sy = useSpring(my, { stiffness: 380, damping: 26, mass: 0.55 });
   const seeded = useRef(false);
-  const onMove = (e) => {
-    if (!seeded.current) { sx.jump(e.clientX); sy.jump(e.clientY); seeded.current = true; }
-    mx.set(e.clientX);
-    my.set(e.clientY);
+  const bind = {
+    onMouseEnter: () => setH(true),
+    onMouseLeave: () => { setH(false); seeded.current = false; },
+    onFocus: () => setH(true),
+    onBlur: () => { setH(false); seeded.current = false; },
+    onMouseMove: (e) => {
+      if (!seeded.current) { sx.jump(e.clientX); sy.jump(e.clientY); seeded.current = true; }
+      mx.set(e.clientX);
+      my.set(e.clientY);
+    },
   };
-  const enter = () => setH(true);
-  const leave = () => { setH(false); seeded.current = false; };
-  return (
-    <a
-      href={href}
-      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      onMouseEnter={enter}
-      onMouseLeave={leave}
-      onMouseMove={badge ? onMove : undefined}
-      onFocus={enter}
-      onBlur={leave}
-      style={{
-        position: "relative", display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
-        padding: "14px 26px", borderRadius: 999,
-        background: h ? "var(--teal)" : "rgba(255,255,255,0.14)",
-        border: `1px solid ${h ? "var(--teal)" : "rgba(30,38,36,0.28)"}`,
-        color: h ? "#ffffff" : "var(--ink)",
-        cursor: badge && h ? "none" : "pointer",
-        backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-        transition: "background .18s ease, color .18s ease, border-color .18s ease",
-      }}
-    >
-      {children}
-      {badge && h && createPortal(
-        <motion.div
-          aria-hidden
-          style={{ position: "fixed", top: 0, left: 0, x: sx, y: sy, zIndex: 60, pointerEvents: "none" }}
-        >
+  const active = enabled && h;
+  const overlay = active
+    ? createPortal(
+        <motion.div aria-hidden style={{ position: "fixed", top: 0, left: 0, x: sx, y: sy, zIndex: 60, pointerEvents: "none" }}>
           <motion.div
             initial={{ scale: 0.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -695,11 +694,40 @@ function GlassButton({ href, external, children, badge }) {
               boxShadow: "0 6px 20px rgba(30,38,36,0.32)",
             }}
           >
-            {badge}
+            {label}
           </motion.div>
         </motion.div>,
         document.body
-      )}
+      )
+    : null;
+  return { bind, active, overlay };
+}
+
+function GlassButton({ href, external, children, badge }) {
+  const [h, setH] = useState(false);
+  const warp = useCursorWarp(badge, !!badge);
+  return (
+    <a
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      onMouseEnter={(e) => { setH(true); warp.bind.onMouseEnter(e); }}
+      onMouseLeave={(e) => { setH(false); warp.bind.onMouseLeave(e); }}
+      onMouseMove={badge ? warp.bind.onMouseMove : undefined}
+      onFocus={(e) => { setH(true); warp.bind.onFocus(e); }}
+      onBlur={(e) => { setH(false); warp.bind.onBlur(e); }}
+      style={{
+        position: "relative", display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
+        padding: "14px 26px", borderRadius: 999,
+        background: h ? "var(--teal)" : "rgba(255,255,255,0.14)",
+        border: `1px solid ${h ? "var(--teal)" : "rgba(30,38,36,0.28)"}`,
+        color: h ? "#ffffff" : "var(--ink)",
+        cursor: warp.active ? "none" : "pointer",
+        backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+        transition: "background .18s ease, color .18s ease, border-color .18s ease",
+      }}
+    >
+      {children}
+      {warp.overlay}
     </a>
   );
 }
@@ -974,6 +1002,7 @@ function ScrollTaproot() {
             progress={scrollYProgress}
             range={[PB[6] + 0.02, PB[6] + 0.07, PB[7] - 0.05, PB[7] - 0.012]}
             label={`${PANELS[6].attribution}: ${PANELS[6].text}`}
+            badge="founder & ceo"
           />
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
             <GlassButton href={CAL_URL} external badge="founder & ceo">{PANELS[7].text}</GlassButton>
