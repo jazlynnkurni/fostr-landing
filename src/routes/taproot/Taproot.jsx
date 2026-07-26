@@ -4,7 +4,7 @@
 // (tooltip pill, document cards, trace cards) by projecting 3D anchors each frame.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, useMotionValue, useSpring } from "framer-motion";
 import Lenis from "lenis";
 import Snap from "lenis/snap";
 import Logo from "../../components/Logo.jsx";
@@ -643,40 +643,78 @@ function PixelImage({ src, progress, range, label }) {
 // with white text on hover.
 function GlassButton({ href, external, children, badge }) {
   const [h, setH] = useState(false);
+  // Cursor-warp badge: while hovering, the native cursor is hidden and the credential
+  // pill lifts off the corner and rides the pointer (spring-trailed = the "warp").
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const sx = useSpring(mx, { stiffness: 380, damping: 26, mass: 0.55 });
+  const sy = useSpring(my, { stiffness: 380, damping: 26, mass: 0.55 });
+  const seeded = useRef(false);
+  const onMove = (e) => {
+    if (!seeded.current) { sx.jump(e.clientX); sy.jump(e.clientY); seeded.current = true; }
+    mx.set(e.clientX);
+    my.set(e.clientY);
+  };
+  const enter = () => setH(true);
+  const leave = () => { setH(false); seeded.current = false; };
   return (
     <a
       href={href}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      onMouseEnter={() => setH(true)}
-      onMouseLeave={() => setH(false)}
-      onFocus={() => setH(true)}
-      onBlur={() => setH(false)}
+      onMouseEnter={enter}
+      onMouseLeave={leave}
+      onMouseMove={badge ? onMove : undefined}
+      onFocus={enter}
+      onBlur={leave}
       style={{
         position: "relative", display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
         padding: "14px 26px", borderRadius: 999,
         background: h ? "var(--teal)" : "rgba(255,255,255,0.14)",
         border: `1px solid ${h ? "var(--teal)" : "rgba(30,38,36,0.28)"}`,
         color: h ? "#ffffff" : "var(--ink)",
+        cursor: badge && h ? "none" : "pointer",
         backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         transition: "background .18s ease, color .18s ease, border-color .18s ease",
       }}
     >
       {children}
       {badge && (
-        // Founder credential, tucked at the corner like a signature — nods to Jaden
-        // being the one you actually get on the call.
+        // Corner credential at rest; fades out as it "lifts off" onto the cursor.
         <span
           aria-hidden
           style={{
-            position: "absolute", right: -6, bottom: -11, transform: `rotate(${h ? -2 : -4}deg)`,
+            position: "absolute", right: -6, bottom: -11, transform: `rotate(-4deg) scale(${h ? 0.6 : 1})`,
             background: "var(--ink)", color: "#FFFFFF", fontFamily: "var(--font-inter)",
             fontWeight: 700, fontSize: 9.5, letterSpacing: "0.06em", textTransform: "uppercase",
             padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", pointerEvents: "none",
-            boxShadow: "0 3px 10px rgba(30,38,36,0.22)", transition: "transform .18s ease",
+            boxShadow: "0 3px 10px rgba(30,38,36,0.22)", opacity: h ? 0 : 1,
+            transition: "opacity .16s ease, transform .16s ease",
           }}
         >
           {badge}
         </span>
+      )}
+      {badge && h && createPortal(
+        <motion.div
+          aria-hidden
+          style={{ position: "fixed", top: 0, left: 0, x: sx, y: sy, zIndex: 60, pointerEvents: "none" }}
+        >
+          <motion.div
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 520, damping: 22 }}
+            style={{
+              transform: "translate(-50%, -50%)",
+              background: "var(--ink)", color: "#FFFFFF", fontFamily: "var(--font-inter)",
+              fontWeight: 700, fontSize: 11, letterSpacing: "0.07em", textTransform: "uppercase",
+              padding: "6px 13px", borderRadius: 999, whiteSpace: "nowrap",
+              boxShadow: "0 6px 20px rgba(30,38,36,0.32)",
+            }}
+          >
+            {badge}
+          </motion.div>
+        </motion.div>,
+        document.body
       )}
     </a>
   );
