@@ -805,7 +805,7 @@ function Recap() {
         {/* book */}
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
           <GlassButton href={CAL_URL} external badge="founder & ceo">{PANELS[7].text}</GlassButton>
-          <GlassButton href={`mailto:${CONTACT_EMAIL}`}>{PANELS[7].secondary}</GlassButton>
+          <GlassButton href={`mailto:${CONTACT_EMAIL}`} badge="founder & ceo">{PANELS[7].secondary}</GlassButton>
         </div>
       </div>
     </section>
@@ -1006,7 +1006,7 @@ function ScrollTaproot() {
           />
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
             <GlassButton href={CAL_URL} external badge="founder & ceo">{PANELS[7].text}</GlassButton>
-            <GlassButton href={`mailto:${CONTACT_EMAIL}`}>{PANELS[7].secondary}</GlassButton>
+            <GlassButton href={`mailto:${CONTACT_EMAIL}`} badge="founder & ceo">{PANELS[7].secondary}</GlassButton>
           </div>
         </div>
       </Panel>
