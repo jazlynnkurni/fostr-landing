@@ -678,22 +678,6 @@ function GlassButton({ href, external, children, badge }) {
       }}
     >
       {children}
-      {badge && (
-        // Corner credential at rest; fades out as it "lifts off" onto the cursor.
-        <span
-          aria-hidden
-          style={{
-            position: "absolute", right: -6, bottom: -11, transform: `rotate(-4deg) scale(${h ? 0.6 : 1})`,
-            background: "var(--ink)", color: "#FFFFFF", fontFamily: "var(--font-inter)",
-            fontWeight: 700, fontSize: 9.5, letterSpacing: "0.06em", textTransform: "uppercase",
-            padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", pointerEvents: "none",
-            boxShadow: "0 3px 10px rgba(30,38,36,0.22)", opacity: h ? 0 : 1,
-            transition: "opacity .16s ease, transform .16s ease",
-          }}
-        >
-          {badge}
-        </span>
-      )}
       {badge && h && createPortal(
         <motion.div
           aria-hidden
