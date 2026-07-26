@@ -762,9 +762,9 @@ function RecapItem({ q, a, open, onToggle }) {
   );
 }
 
-// The closing recap: a calm, solid-ground section after the descent. Restates the
-// premise in one glance, then FAQ + book, so nobody has to scroll back up through the
-// animation to remember what Fostr is. (Jaden + Abraham's request.)
+// The closing recap: the descent breaks the surface at the sprout, and everything you
+// need sits in that daylight — premise, FAQ, book. Grown into the same dotted-earth
+// world so it reads as the end of the journey, not a separate page. (Jaden + Abraham.)
 function Recap() {
   const [open, setOpen] = useState(-1);
   const points = [
@@ -772,18 +772,38 @@ function Recap() {
     { k: "What Fostr does", v: "Capture it once, during the visit, and send it everywhere it's owed. Every line traces back to the record, so it holds up in court." },
     { k: "Who it's for", v: "Child welfare first, alongside the people already doing the work. Group homes and elder care come next." },
   ];
+  const grow = { hidden: { pathLength: 0 }, show: { pathLength: 1 } };
   return (
-    <section style={{ position: "relative", zIndex: 2, background: "#FFFFFF", color: "var(--ink)", borderTop: "1px solid rgba(30,38,36,0.08)" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "clamp(64px, 12vh, 130px) clamp(20px, 6vw, 56px) clamp(70px, 14vh, 140px)" }}>
-        <div style={{ ...mono, fontSize: 12, letterSpacing: "0.26em", textTransform: "uppercase", color: "var(--teal)", marginBottom: 16 }}>
+    <section style={{ position: "relative", zIndex: 2, overflow: "hidden", color: "var(--ink)", background: "linear-gradient(180deg, #F1F7F5 0%, #FFFFFF 24%)" }}>
+      {/* daylight bloom the sprout breaks into */}
+      <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(120% 62% at 50% -6%, rgba(111,206,204,0.22) 0%, rgba(255,255,255,0) 56%)" }} />
+      {/* dotted earth rising at the foot — the pixel-ground motif from the descent */}
+      <div aria-hidden style={{
+        position: "absolute", left: 0, right: 0, bottom: 0, height: "40%", pointerEvents: "none",
+        backgroundImage: "radial-gradient(rgba(42,122,120,0.5) 1.25px, transparent 1.5px)",
+        backgroundSize: "13px 13px",
+        WebkitMaskImage: "linear-gradient(to top, #000 0%, rgba(0,0,0,0.45) 40%, transparent 100%)",
+        maskImage: "linear-gradient(to top, #000 0%, rgba(0,0,0,0.45) 40%, transparent 100%)",
+      }} />
+
+      <div style={{ position: "relative", maxWidth: 900, margin: "0 auto", padding: "clamp(52px, 9vh, 104px) clamp(20px, 6vw, 56px) clamp(84px, 16vh, 154px)" }}>
+        {/* the two-leaf sprout, re-grown as the crown of the close */}
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <motion.svg viewBox="112 122 32 20" width="58" aria-hidden style={{ overflow: "visible", display: "inline-block" }} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.6 }}>
+            <motion.path d="M128.571 140V131.952C127.175 129.999 121.029 125.903 116 127.619" stroke="var(--teal)" strokeWidth="4.19" strokeLinecap="round" fill="none" variants={grow} transition={{ duration: 0.7, ease: "easeOut" }} />
+            <motion.path d="M128.571 131.952C130.899 129.222 137.79 125.698 141.143 127.485" stroke="var(--teal)" strokeWidth="4.19" strokeLinecap="round" fill="none" variants={grow} transition={{ duration: 0.7, ease: "easeOut", delay: 0.14 }} />
+          </motion.svg>
+        </div>
+
+        <div style={{ textAlign: "center", ...mono, fontSize: 12, letterSpacing: "0.26em", textTransform: "uppercase", color: "var(--teal)", marginBottom: 14 }}>
           The whole thing, in one place
         </div>
-        <h2 style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "clamp(1.9rem, 5vw, 3.2rem)", lineHeight: 1.12, letterSpacing: "-0.02em", margin: "0 0 34px", textWrap: "balance" }}>
+        <h2 style={{ textAlign: "center", fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "clamp(1.9rem, 5vw, 3.2rem)", lineHeight: 1.12, letterSpacing: "-0.02em", margin: "0 auto 42px", maxWidth: "17ch", textWrap: "balance" }}>
           Paperwork should never come before a kid.
         </h2>
 
         {/* premise, restated as three plain beats */}
-        <div style={{ display: "grid", gap: 2, marginBottom: 44 }}>
+        <div style={{ display: "grid", gap: 2, marginBottom: 50, maxWidth: 760, marginLeft: "auto", marginRight: "auto" }}>
           {points.map((p) => (
             <div key={p.k} style={{ display: "grid", gridTemplateColumns: "minmax(120px, 0.28fr) 1fr", gap: "clamp(12px, 3vw, 34px)", alignItems: "baseline", padding: "16px 0", borderTop: "1px solid rgba(30,38,36,0.1)" }}>
               <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "clamp(0.95rem, 1.6vw, 1.05rem)", color: "var(--teal)" }}>{p.k}</div>
@@ -793,19 +813,21 @@ function Recap() {
         </div>
 
         {/* FAQ */}
-        <div style={{ ...mono, fontSize: 12, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(30,38,36,0.5)", margin: "0 0 6px" }}>
-          Questions, answered
-        </div>
-        <div style={{ marginBottom: 44 }}>
-          {FAQS.map((f, i) => (
-            <RecapItem key={f.q} q={f.q} a={f.a} open={open === i} onToggle={() => setOpen(open === i ? -1 : i)} />
-          ))}
-        </div>
+        <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          <div style={{ ...mono, fontSize: 12, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(30,38,36,0.5)", margin: "0 0 6px" }}>
+            Questions, answered
+          </div>
+          <div style={{ marginBottom: 46 }}>
+            {FAQS.map((f, i) => (
+              <RecapItem key={f.q} q={f.q} a={f.a} open={open === i} onToggle={() => setOpen(open === i ? -1 : i)} />
+            ))}
+          </div>
 
-        {/* book */}
-        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <GlassButton href={CAL_URL} external badge="founder & ceo">{PANELS[7].text}</GlassButton>
-          <GlassButton href={`mailto:${CONTACT_EMAIL}`} badge="founder & ceo">{PANELS[7].secondary}</GlassButton>
+          {/* book — resting on the dotted earth */}
+          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <GlassButton href={CAL_URL} external badge="founder & ceo">{PANELS[7].text}</GlassButton>
+            <GlassButton href={`mailto:${CONTACT_EMAIL}`} badge="founder & ceo">{PANELS[7].secondary}</GlassButton>
+          </div>
         </div>
       </div>
     </section>
