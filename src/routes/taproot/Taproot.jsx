@@ -6,8 +6,9 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from "lenis";
+import Snap from "lenis/snap";
 import Logo from "../../components/Logo.jsx";
-import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE, CAL_URL, CONTACT_EMAIL } from "../../copy.js";
+import { PANELS, BUSINESS_LINE, DEMO_DOCS, TRACE_EXAMPLE, CAL_URL, CONTACT_EMAIL, FAQS } from "../../copy.js";
 import { SECTION_VHS, PB } from "./journey.js";
 import StaticTaproot from "./StaticTaproot.jsx";
 
@@ -640,7 +641,7 @@ function PixelImage({ src, progress, range, label }) {
 
 // Frosted-glass CTA: transparent (blurred) with a hairline border; fills turquoise
 // with white text on hover.
-function GlassButton({ href, external, children }) {
+function GlassButton({ href, external, children, badge }) {
   const [h, setH] = useState(false);
   return (
     <a
@@ -651,7 +652,7 @@ function GlassButton({ href, external, children }) {
       onFocus={() => setH(true)}
       onBlur={() => setH(false)}
       style={{
-        display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
+        position: "relative", display: "inline-block", textDecoration: "none", fontSize: 15, fontWeight: 600,
         padding: "14px 26px", borderRadius: 999,
         background: h ? "var(--teal)" : "rgba(255,255,255,0.14)",
         border: `1px solid ${h ? "var(--teal)" : "rgba(30,38,36,0.28)"}`,
@@ -661,7 +662,103 @@ function GlassButton({ href, external, children }) {
       }}
     >
       {children}
+      {badge && (
+        // Founder credential, tucked at the corner like a signature — nods to Jaden
+        // being the one you actually get on the call.
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", right: -6, bottom: -11, transform: `rotate(${h ? -2 : -4}deg)`,
+            background: "var(--ink)", color: "#FFFFFF", fontFamily: "var(--font-inter)",
+            fontWeight: 700, fontSize: 9.5, letterSpacing: "0.06em", textTransform: "uppercase",
+            padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", pointerEvents: "none",
+            boxShadow: "0 3px 10px rgba(30,38,36,0.22)", transition: "transform .18s ease",
+          }}
+        >
+          {badge}
+        </span>
+      )}
     </a>
+  );
+}
+
+// Recap accordion row — the FAQ, inline at the bottom so the premise is re-gatherable
+// without re-scrolling the whole descent.
+function RecapItem({ q, a, open, onToggle }) {
+  return (
+    <div style={{ borderBottom: "1px solid rgba(30,38,36,0.12)" }}>
+      <button
+        onClick={onToggle}
+        aria-expanded={open}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18,
+          padding: "18px 2px", background: "none", border: "none", cursor: "pointer", textAlign: "left",
+          color: "var(--ink)", fontFamily: "var(--font-sans)", fontWeight: 500,
+          fontSize: "clamp(1rem, 2vw, 1.2rem)", letterSpacing: "-0.01em",
+        }}
+      >
+        <span>{q}</span>
+        <span aria-hidden style={{ flex: "0 0 auto", width: 24, height: 24, position: "relative", color: "var(--teal)" }}>
+          <span style={{ position: "absolute", top: "50%", left: "50%", width: 14, height: 2, background: "currentColor", transform: "translate(-50%,-50%)" }} />
+          <span style={{ position: "absolute", top: "50%", left: "50%", width: 2, height: 14, background: "currentColor", transform: `translate(-50%,-50%) rotate(${open ? 90 : 0}deg)`, transition: "transform .25s ease" }} />
+        </span>
+      </button>
+      <div style={{ display: "grid", gridTemplateRows: open ? "1fr" : "0fr", transition: "grid-template-rows .3s ease" }}>
+        <div style={{ overflow: "hidden" }}>
+          <p style={{ margin: 0, padding: "0 2px 20px", maxWidth: "60ch", fontSize: "clamp(0.96rem, 1.5vw, 1.05rem)", lineHeight: 1.65, color: "rgba(30,38,36,0.76)" }}>{a}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The closing recap: a calm, solid-ground section after the descent. Restates the
+// premise in one glance, then FAQ + book, so nobody has to scroll back up through the
+// animation to remember what Fostr is. (Jaden + Abraham's request.)
+function Recap() {
+  const [open, setOpen] = useState(-1);
+  const points = [
+    { k: "The problem", v: "Most of a caseworker's day never reaches a kid. It goes into forms, the same facts typed over and over." },
+    { k: "What Fostr does", v: "Capture it once, during the visit, and send it everywhere it's owed. Every line traces back to the record, so it holds up in court." },
+    { k: "Who it's for", v: "Child welfare first, alongside the people already doing the work. Group homes and elder care come next." },
+  ];
+  return (
+    <section style={{ position: "relative", zIndex: 2, background: "#FFFFFF", color: "var(--ink)", borderTop: "1px solid rgba(30,38,36,0.08)" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "clamp(64px, 12vh, 130px) clamp(20px, 6vw, 56px) clamp(70px, 14vh, 140px)" }}>
+        <div style={{ ...mono, fontSize: 12, letterSpacing: "0.26em", textTransform: "uppercase", color: "var(--teal)", marginBottom: 16 }}>
+          The whole thing, in one place
+        </div>
+        <h2 style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "clamp(1.9rem, 5vw, 3.2rem)", lineHeight: 1.12, letterSpacing: "-0.02em", margin: "0 0 34px", textWrap: "balance" }}>
+          Paperwork should never come before a kid.
+        </h2>
+
+        {/* premise, restated as three plain beats */}
+        <div style={{ display: "grid", gap: 2, marginBottom: 44 }}>
+          {points.map((p) => (
+            <div key={p.k} style={{ display: "grid", gridTemplateColumns: "minmax(120px, 0.28fr) 1fr", gap: "clamp(12px, 3vw, 34px)", alignItems: "baseline", padding: "16px 0", borderTop: "1px solid rgba(30,38,36,0.1)" }}>
+              <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "clamp(0.95rem, 1.6vw, 1.05rem)", color: "var(--teal)" }}>{p.k}</div>
+              <div style={{ fontSize: "clamp(1rem, 1.7vw, 1.15rem)", lineHeight: 1.6, color: "rgba(30,38,36,0.86)" }}>{p.v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* FAQ */}
+        <div style={{ ...mono, fontSize: 12, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(30,38,36,0.5)", margin: "0 0 6px" }}>
+          Questions, answered
+        </div>
+        <div style={{ marginBottom: 44 }}>
+          {FAQS.map((f, i) => (
+            <RecapItem key={f.q} q={f.q} a={f.a} open={open === i} onToggle={() => setOpen(open === i ? -1 : i)} />
+          ))}
+        </div>
+
+        {/* book */}
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <GlassButton href={CAL_URL} external badge="founder & ceo">{PANELS[7].text}</GlassButton>
+          <GlassButton href={`mailto:${CONTACT_EMAIL}`}>{PANELS[7].secondary}</GlassButton>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -700,19 +797,37 @@ function ScrollTaproot() {
     els: { pill: null, cards: [null, null, null, null], filing: null, filingLine: null, source: null },
   });
   const lenisRef = useRef(null);
+  const panelsRef = useRef(null); // wraps only the 8 choreographed panels
   const faqHover = useRef(false); // true while the FAQ button is hovered (hides the mosaic)
-  const { scrollYProgress } = useScroll();
+  // Progress is measured over the PANELS only (not the whole document) so the recap
+  // section below can be appended without shifting the camera + panel choreography,
+  // which is all keyed off PB fractions of this value.
+  const { scrollYProgress } = useScroll({ target: panelsRef, offset: ["start start", "end end"] });
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const lenis = new Lenis({ lerp: 0.11 });
+    // A touch more weight (slightly slower wheel) so panels don't blow past on a flick.
+    const lenis = new Lenis({ lerp: 0.1, wheelMultiplier: 0.9 });
     lenisRef.current = lenis;
+
+    // Proximity snap onto each panel: when the reader eases up near a section it settles
+    // onto it instead of drifting through a fade. Gentle — never fights an active scroll.
+    const snap = new Snap(lenis, { type: "proximity", duration: 0.9, distanceThreshold: "18%", debounce: 450 });
+    const removers = [];
+    if (panelsRef.current) {
+      for (const el of Array.from(panelsRef.current.children)) {
+        removers.push(snap.addElement(el, { align: ["start"], ignoreSticky: true }));
+      }
+    }
+
     let raf = requestAnimationFrame(function loop(t) {
       lenis.raf(t);
       raf = requestAnimationFrame(loop);
     });
     return () => {
       cancelAnimationFrame(raf);
+      removers.forEach((r) => typeof r === "function" && r());
+      snap.destroy();
       lenis.destroy();
       lenisRef.current = null;
     };
@@ -720,8 +835,9 @@ function ScrollTaproot() {
 
   const onPill = () => {
     const next = Math.min(bridge.current.pillTarget, 7);
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    const top = PB[next] * max + 2;
+    // Panel region only: PB fractions map onto the panels' own scroll span.
+    const panelMax = (panelsRef.current?.offsetHeight || document.documentElement.scrollHeight) - window.innerHeight;
+    const top = PB[next] * panelMax + 2;
     if (lenisRef.current) lenisRef.current.scrollTo(top, { duration: 1.1 });
     else window.scrollTo({ top, behavior: "smooth" });
   };
@@ -776,6 +892,8 @@ function ScrollTaproot() {
         <FaqButton hoverRef={faqHover} />
       </nav>
 
+      {/* the 8 choreographed panels — scroll progress is scoped to this wrapper */}
+      <div ref={panelsRef}>
       {/* 1 — HERO, above ground */}
       <Panel
         i={0}
@@ -836,7 +954,7 @@ function ScrollTaproot() {
             label={`${PANELS[6].attribution}: ${PANELS[6].text}`}
           />
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
-            <GlassButton href={CAL_URL} external>{PANELS[7].text}</GlassButton>
+            <GlassButton href={CAL_URL} external badge="founder & ceo">{PANELS[7].text}</GlassButton>
             <GlassButton href={`mailto:${CONTACT_EMAIL}`}>{PANELS[7].secondary}</GlassButton>
           </div>
         </div>
@@ -863,6 +981,10 @@ function ScrollTaproot() {
           </svg>
         </div>
       </Panel>
+      </div>{/* /panels wrapper */}
+
+      {/* closing recap: premise + FAQ + book, on solid ground below the descent */}
+      <Recap />
 
       {/* ---- fixed overlays, positioned each frame by Scene.jsx ---- */}
 
