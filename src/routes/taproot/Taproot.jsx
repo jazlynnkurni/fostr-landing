@@ -687,7 +687,8 @@ function useCursorWarp(label, enabled = true) {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 520, damping: 22 }}
             style={{
-              transform: "translate(-50%, -50%)",
+              // offset from the cursor is live-tunable via CSS vars (see PillTuner, ?pilltune)
+              transform: "translate(calc(-50% + var(--pill-dx, 0px)), calc(-50% + var(--pill-dy, 0px)))",
               background: "var(--ink)", color: "#FFFFFF", fontFamily: "var(--font-inter)",
               fontWeight: 700, fontSize: 11, letterSpacing: "0.07em", textTransform: "uppercase",
               padding: "6px 13px", borderRadius: 999, whiteSpace: "nowrap",
@@ -774,9 +775,10 @@ function Recap() {
   ];
   const grow = { hidden: { pathLength: 0 }, show: { pathLength: 1 } };
   return (
-    <section style={{ position: "relative", zIndex: 2, overflow: "hidden", color: "var(--ink)", background: "linear-gradient(180deg, #F1F7F5 0%, #FFFFFF 24%)" }}>
-      {/* daylight bloom the sprout breaks into */}
-      <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(120% 62% at 50% -6%, rgba(111,206,204,0.22) 0%, rgba(255,255,255,0) 56%)" }} />
+    <section style={{ position: "relative", zIndex: 2, overflow: "hidden", color: "var(--ink)",
+      // Transparent at the very top so the teal scene above bleeds straight through and
+      // dissolves to white over a soft fixed fade — no hard turquoise/white seam.
+      background: "linear-gradient(180deg, rgba(255,255,255,0) 0px, rgba(255,255,255,0) 34px, rgba(255,255,255,0.85) 210px, #FFFFFF 320px)" }}>
       {/* dotted earth rising at the foot — the pixel-ground motif from the descent */}
       <div aria-hidden style={{
         position: "absolute", left: 0, right: 0, bottom: 0, height: "40%", pointerEvents: "none",
@@ -786,7 +788,7 @@ function Recap() {
         maskImage: "linear-gradient(to top, #000 0%, rgba(0,0,0,0.45) 40%, transparent 100%)",
       }} />
 
-      <div style={{ position: "relative", maxWidth: 900, margin: "0 auto", padding: "clamp(52px, 9vh, 104px) clamp(20px, 6vw, 56px) clamp(84px, 16vh, 154px)" }}>
+      <div style={{ position: "relative", maxWidth: 900, margin: "0 auto", padding: "clamp(260px, 38vh, 380px) clamp(20px, 6vw, 56px) clamp(84px, 16vh, 154px)" }}>
         {/* the two-leaf sprout, re-grown as the crown of the close */}
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           <motion.svg viewBox="112 122 32 20" width="58" aria-hidden style={{ overflow: "visible", display: "inline-block" }} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.6 }}>
@@ -860,6 +862,49 @@ function FaqButton({ hoverRef }) {
   );
 }
 
+// Live tuner for the cursor-warp pill's offset from the cursor. Visit ?pilltune to show
+// it. Drives --pill-dx / --pill-dy so the change is instant on the real buttons + photo,
+// with a mini preview (cursor dot + pill) so you can dial the exact distance precisely.
+function PillTuner() {
+  const [dx, setDx] = useState(0);
+  const [dy, setDy] = useState(0);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--pill-dx", dx + "px");
+    document.documentElement.style.setProperty("--pill-dy", dy + "px");
+  }, [dx, dy]);
+  if (typeof window === "undefined" || !/(\?|&)pilltune/.test(window.location.search)) return null;
+  const row = { display: "grid", gridTemplateColumns: "18px 1fr 56px", gap: 10, alignItems: "center" };
+  const num = { width: 56, fontFamily: "var(--font-inter)", fontSize: 12, padding: "4px 6px", border: "1px solid rgba(0,0,0,.15)", borderRadius: 6, textAlign: "right", boxSizing: "border-box" };
+  return (
+    <div style={{ position: "fixed", left: 16, bottom: 16, zIndex: 80, background: "rgba(255,255,255,.97)", border: "1px solid rgba(0,0,0,.12)", borderRadius: 14, padding: 16, width: 264, boxShadow: "0 12px 40px rgba(0,0,0,.18)", fontFamily: "var(--font-inter)", color: "#1E2624" }}>
+      <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 12 }}>Cursor → pill distance</div>
+
+      {/* preview: dot = cursor, pill = where it lands at this offset */}
+      <div style={{ position: "relative", height: 96, borderRadius: 10, background: "#EAF2F0", overflow: "hidden", marginBottom: 14 }}>
+        <div style={{ position: "absolute", left: "50%", top: "50%", width: 8, height: 8, borderRadius: 999, background: "#1E2624", transform: "translate(-50%,-50%)", boxShadow: "0 0 0 3px rgba(30,38,36,.15)" }} />
+        <div style={{ position: "absolute", left: "50%", top: "50%", transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`, background: "var(--ink)", color: "#fff", fontWeight: 700, fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", padding: "5px 10px", borderRadius: 999, whiteSpace: "nowrap", boxShadow: "0 4px 14px rgba(30,38,36,.3)" }}>founder & ceo</div>
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        <div style={row}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>X</span>
+          <input type="range" min={-140} max={140} value={dx} onChange={(e) => setDx(+e.target.value)} />
+          <input type="number" value={dx} onChange={(e) => setDx(+e.target.value)} style={num} />
+        </div>
+        <div style={row}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>Y</span>
+          <input type="range" min={-140} max={140} value={dy} onChange={(e) => setDy(+e.target.value)} />
+          <input type="number" value={dy} onChange={(e) => setDy(+e.target.value)} style={num} />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 11, color: "rgba(30,38,36,.62)", lineHeight: 1.5 }}>
+        Live on the real buttons + Jaden's photo. Landed on <b>x&nbsp;{dx}, y&nbsp;{dy}</b>? Tell me and I'll bake it in as the default.
+      </div>
+    </div>
+  );
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -916,13 +961,9 @@ function ScrollTaproot() {
 
   // Masthead flips from ink to paper as the horizon crosses.
   const mastheadColor = useTransform(scrollYProgress, [0, 1], ["#1E2624", "#1E2624"]);
-  // Panel 8: daylight-adjacent warmth rising from the ground.
+  // Panel 8: daylight-adjacent warmth rising from the ground. The single sprout now
+  // lives as the crown of the recap below (so it sits with the FAQ, not floating here).
   const warmO = useTransform(scrollYProgress, [PB[7] + 0.02, 0.98], [0, 1]);
-  // The shoot resolves into the two-leaf sprout glyph, drawn stroke by stroke.
-  const leaf1 = useTransform(scrollYProgress, [PB[7] + 0.035, PB[7] + 0.075], [0, 1]);
-  const leaf2 = useTransform(scrollYProgress, [PB[7] + 0.055, PB[7] + 0.095], [0, 1]);
-  const ctaO = useTransform(scrollYProgress, [PB[7] + 0.06, PB[7] + 0.1], [0, 1]);
-  const ctaY = useTransform(scrollYProgress, [PB[7] + 0.06, PB[7] + 0.1], [18, 0]);
 
   const setEl = (key) => (el) => {
     bridge.current.els[key] = el;
@@ -939,6 +980,7 @@ function ScrollTaproot() {
 
       <CursorMosaic hideRef={faqHover} />
       <ColorTuner bridge={bridge} />
+      <PillTuner />
 
       {/* warm ground for germination */}
       <motion.div
@@ -1033,26 +1075,9 @@ function ScrollTaproot() {
         </div>
       </Panel>
 
-      {/* 8 — germination: the shoot resolves into the two-leaf sprout, a quiet close */}
+      {/* 8 — germination: a quiet close at the seed. The sprout now crowns the recap. */}
       <Panel i={7} progress={scrollYProgress}>
-        <div style={{ textAlign: "center" }}>
-          <svg viewBox="112 122 32 20" width="72" aria-hidden style={{ overflow: "visible", display: "inline-block" }}>
-            <motion.path
-              d="M128.571 140V131.952C127.175 129.999 121.029 125.903 116 127.619"
-              stroke="var(--teal)"
-              strokeWidth="4.19"
-              fill="none"
-              style={{ pathLength: leaf1 }}
-            />
-            <motion.path
-              d="M128.571 131.952C130.899 129.222 137.79 125.698 141.143 127.485"
-              stroke="var(--teal)"
-              strokeWidth="4.19"
-              fill="none"
-              style={{ pathLength: leaf2 }}
-            />
-          </svg>
-        </div>
+        <div aria-hidden />
       </Panel>
       </div>{/* /panels wrapper */}
 
