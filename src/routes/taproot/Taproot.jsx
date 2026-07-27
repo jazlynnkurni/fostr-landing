@@ -905,6 +905,33 @@ function PillTuner() {
   );
 }
 
+// Scroll affordances. Many first-time viewers don't realize the descent is
+// scroll-driven (they try to click the interactive headline). A subtle bobbing chevron
+// cues the first scroll and fades the moment you move; a slim right-edge rail then
+// scrubs with progress like a timeline, so you can feel you're moving through a
+// sequence rather than stuck. Handoff: arrow at the hero → rail during the descent.
+function ScrollCue({ progress }) {
+  const opacity = useTransform(progress, [0, 0.015, 0.045], [1, 1, 0]);
+  return (
+    <motion.div aria-hidden style={{ position: "fixed", left: "50%", bottom: 30, x: "-50%", zIndex: 6, pointerEvents: "none", opacity }}>
+      <motion.svg width="17" height="26" viewBox="0 0 17 26" fill="none" animate={{ y: [0, 6, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}>
+        <path d="M8.5 1 V 21" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M2.5 15 L8.5 21 L14.5 15" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </motion.svg>
+    </motion.div>
+  );
+}
+
+function ProgressRail({ progress }) {
+  const scaleY = useTransform(progress, [0, 1], [0, 1]);
+  const opacity = useTransform(progress, [0, 0.015, 0.95, 1], [0, 0.85, 0.85, 0]);
+  return (
+    <motion.div aria-hidden style={{ position: "fixed", right: 20, top: "26vh", height: "48vh", width: 2, borderRadius: 2, background: "rgba(30,38,36,0.10)", zIndex: 6, pointerEvents: "none", opacity }}>
+      <motion.div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", borderRadius: 2, background: "var(--teal)", transformOrigin: "top", scaleY }} />
+    </motion.div>
+  );
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -979,6 +1006,8 @@ function ScrollTaproot() {
       </div>
 
       <CursorMosaic hideRef={faqHover} />
+      <ScrollCue progress={scrollYProgress} />
+      <ProgressRail progress={scrollYProgress} />
       <ColorTuner bridge={bridge} />
       <PillTuner />
 
@@ -1064,7 +1093,10 @@ function ScrollTaproot() {
           <PixelImage
             src={`${import.meta.env.BASE_URL}jaden.png`}
             progress={scrollYProgress}
-            range={[PB[6] + 0.02, PB[6] + 0.07, PB[7] - 0.05, PB[7] - 0.012]}
+            // Assemble early and hold the fully-rendered face across most of the panel's
+            // lock, disassembling only near the very end — so Jaden's face reads clearly
+            // and long instead of only flashing whole for an instant. (Jaden's nit.)
+            range={[PB[6] + 0.01, PB[6] + 0.045, PB[7] - 0.03, PB[7] - 0.008]}
             label={`${PANELS[6].attribution}: ${PANELS[6].text}`}
             badge="founder & ceo"
           />
