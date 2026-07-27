@@ -1062,7 +1062,7 @@ function ScrollTaproot() {
             {BUSINESS_LINE}
           </div>
           <PixelImage
-            src="/jaden.png"
+            src={`${import.meta.env.BASE_URL}jaden.png`}
             progress={scrollYProgress}
             range={[PB[6] + 0.02, PB[6] + 0.07, PB[7] - 0.05, PB[7] - 0.012]}
             label={`${PANELS[6].attribution}: ${PANELS[6].text}`}
