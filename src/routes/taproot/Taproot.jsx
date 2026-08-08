@@ -932,6 +932,176 @@ function ProgressRail({ progress }) {
   );
 }
 
+// Chapter scrubber — a bottom depth-gauge rail that lets a reader jump straight to any
+// beat of the descent instead of scrolling the whole borehole. Clickable stops, a knob
+// that tracks live scroll position, and an ink label pill (the same pill as the
+// cursor-warp badge) that names the chapter under the cursor. Fades in once you leave
+// the hero, handing off from the bobbing scroll chevron.
+const CHAPTERS = [
+  { label: "The problem", pb: 0 },
+  { label: "The fix", pb: 3 },
+  { label: "The proof", pb: 4 },
+  { label: "Who it's for", pb: 5 },
+  { label: "The founder", pb: 6 },
+  { label: "Talk to Jaden", recap: true },
+];
+
+function ChapterNav({ lenisRef, panelsRef }) {
+  const N = CHAPTERS.length;
+  const [active, setActive] = useState(0);
+  const [hover, setHover] = useState(-1);
+  const [visible, setVisible] = useState(false);
+  const knob = useMotionValue(0); // 0..1 along the rail
+  const sknob = useSpring(knob, { stiffness: 260, damping: 34, mass: 0.7 });
+  const tops = useRef([]);
+  const wasVis = useRef(false);
+
+  const measure = () => {
+    const pol = panelsRef.current;
+    if (!pol) return;
+    const panelH = pol.offsetHeight;
+    const panelMax = Math.max(1, panelH - window.innerHeight);
+    const docMax = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    tops.current = CHAPTERS.map((c) =>
+      c.recap ? Math.min(panelH, docMax) : Math.min(docMax, Math.max(0, PB[c.pb] * panelMax))
+    );
+  };
+
+  useEffect(() => {
+    measure();
+    const id = setTimeout(measure, 600);
+    const onResize = () => measure();
+    const onScroll = () => {
+      const t = tops.current;
+      if (!t.length) return;
+      const y = window.scrollY;
+      let frac = 0;
+      if (y <= t[0]) frac = 0;
+      else if (y >= t[N - 1]) frac = N - 1;
+      else {
+        for (let i = 0; i < N - 1; i++) {
+          if (y >= t[i] && y <= t[i + 1]) {
+            const span = t[i + 1] - t[i];
+            frac = i + (span > 0 ? (y - t[i]) / span : 0);
+            break;
+          }
+        }
+      }
+      knob.set(N > 1 ? frac / (N - 1) : 0);
+      setActive(Math.round(frac));
+      const vis = window.scrollY / Math.max(1, window.innerHeight) > 0.02;
+      if (vis !== wasVis.current) { wasVis.current = vis; setVisible(vis); }
+    };
+    onScroll();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  const jump = (i) => {
+    measure();
+    const top = (tops.current[i] || 0) + (CHAPTERS[i].recap ? 0 : 2);
+    if (lenisRef.current) lenisRef.current.scrollTo(top, { duration: 1.15 });
+    else window.scrollTo({ top, behavior: "smooth" });
+  };
+
+  const shown = hover >= 0 ? hover : active;
+  const knobLeft = useTransform(sknob, (v) => `${v * 100}%`);
+  const fillWidth = useTransform(sknob, (v) => `${v * 100}%`);
+
+  return (
+    <nav
+      aria-label="Chapters"
+      style={{
+        position: "fixed", left: "50%", bottom: "clamp(16px, 3vh, 26px)", transform: "translateX(-50%)",
+        zIndex: 9, opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none",
+        transition: "opacity .45s ease", fontFamily: "var(--font-inter)",
+      }}
+    >
+      <div
+        style={{
+          position: "relative", display: "flex", alignItems: "center",
+          padding: "13px 26px", borderRadius: 999, overflow: "visible",
+          background: "rgba(26,36,34,0.62)", border: "1px solid rgba(255,255,255,0.10)",
+          backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+          boxShadow: "0 10px 34px rgba(16,32,31,0.32)",
+        }}
+      >
+        {/* the rail */}
+        <div style={{ position: "relative", width: "min(300px, 66vw)", height: 14 }}>
+          {/* baseline */}
+          <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 2, transform: "translateY(-50%)", borderRadius: 2, background: "rgba(255,255,255,0.20)" }} />
+          {/* progress fill up to the knob */}
+          <motion.div style={{ position: "absolute", top: "50%", left: 0, height: 2, transform: "translateY(-50%)", borderRadius: 2, background: "var(--teal)", width: fillWidth }} />
+
+          {/* chapter stops */}
+          {CHAPTERS.map((c, i) => {
+            const on = i <= active;
+            const last = i === N - 1;
+            return (
+              <button
+                key={c.label}
+                aria-label={`Jump to: ${c.label}`}
+                onClick={() => jump(i)}
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(-1)}
+                onFocus={() => setHover(i)}
+                onBlur={() => setHover(-1)}
+                style={{
+                  position: "absolute", top: "50%", left: `${(i / (N - 1)) * 100}%`,
+                  transform: "translate(-50%, -50%)", width: 22, height: 22, padding: 0,
+                  border: "none", background: "none", cursor: "pointer", display: "grid", placeItems: "center",
+                }}
+              >
+                <span
+                  style={{
+                    width: last ? 11 : 7, height: last ? 11 : 7, borderRadius: 999,
+                    background: last ? "transparent" : on ? "var(--teal)" : "rgba(255,255,255,0.34)",
+                    border: last ? `2px solid ${on ? "var(--teal)" : "rgba(255,255,255,0.4)"}` : "none",
+                    transition: "background .2s ease, border-color .2s ease",
+                  }}
+                />
+              </button>
+            );
+          })}
+
+          {/* live-position knob */}
+          <motion.div
+            aria-hidden
+            style={{
+              position: "absolute", top: "50%", left: knobLeft, translateX: "-50%", translateY: "-50%",
+              width: 15, height: 15, borderRadius: 999, background: "#FFFFFF",
+              border: "2px solid var(--teal)", boxShadow: "0 2px 8px rgba(0,0,0,0.28)",
+            }}
+          />
+
+          {/* label pill above the chapter under the cursor (or the active one) */}
+          <div
+            aria-hidden
+            style={{
+              position: "absolute", bottom: "calc(100% + 14px)", left: `${(shown / (N - 1)) * 100}%`,
+              transform: "translateX(-50%)", whiteSpace: "nowrap", pointerEvents: "none",
+            }}
+          >
+            <div style={{
+              position: "relative", background: "var(--ink)", color: "#fff", fontWeight: 700, fontSize: 11,
+              letterSpacing: "0.06em", textTransform: "uppercase", padding: "6px 12px", borderRadius: 999,
+              boxShadow: "0 6px 18px rgba(16,32,31,0.34)",
+            }}>
+              {CHAPTERS[shown].label}
+              <span style={{ position: "absolute", top: "100%", left: "50%", width: 8, height: 8, marginTop: -4, background: "var(--ink)", transform: "translateX(-50%) rotate(45deg)", borderRadius: 1 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
 function ScrollTaproot() {
   const bridge = useRef({
     p: 0,
@@ -1008,6 +1178,7 @@ function ScrollTaproot() {
       <CursorMosaic hideRef={faqHover} />
       <ScrollCue progress={scrollYProgress} />
       <ProgressRail progress={scrollYProgress} />
+      <ChapterNav lenisRef={lenisRef} panelsRef={panelsRef} />
       <ColorTuner bridge={bridge} />
       <PillTuner />
 
