@@ -16,3 +16,8 @@
 }
 html { scroll-behavior: auto; }
 body { margin: 0; font-family: var(--font-sans); background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+/* Hide the native (gray) scrollbar — the turquoise ProgressRail is the only
+   scroll indicator. Scrolling stays fully functional (wheel/trackpad/Lenis). */
+html, body { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display: none; }
